@@ -13,7 +13,9 @@ The web app is available at `http://localhost:5173`; the API health endpoint is 
 
 ## Status
 
-Twitch OAuth, Prisma persistence, WebSockets, and external API routes are planned but intentionally not connected in this scaffold. See `plan/` for implementation-ready follow-up slices.
+The project includes Twitch OAuth endpoints, Prisma-backed lobby data, WebSocket synchronization, and a scoped read API. See `plan/` for the remaining implementation slices.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Portainer and Traefik deployment.
 
 ## License
 
