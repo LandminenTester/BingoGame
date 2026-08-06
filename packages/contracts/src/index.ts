@@ -59,3 +59,5 @@ export type LobbyEvent =
   | { type: 'lobby.task_changed'; lobbyId: string; fieldId: string; completed: boolean }
   | { type: 'lobby.ranking_updated'; lobbyId: string; results: RankingResult[] }
   | { type: 'lobby.snapshot'; lobby: LobbySummary };
+
+export * from './game.js';
