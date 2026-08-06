@@ -11,6 +11,7 @@ const environment = z
     TWITCH_CLIENT_ID: z.string().min(1).optional(),
     TWITCH_CLIENT_SECRET: z.string().min(1).optional(),
     TWITCH_REDIRECT_URI: z.string().url().optional(),
+    SESSION_SECRET: z.string().min(32).optional(),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return;
@@ -20,6 +21,7 @@ const environment = z
       'TWITCH_CLIENT_ID',
       'TWITCH_CLIENT_SECRET',
       'TWITCH_REDIRECT_URI',
+      'SESSION_SECRET',
     ] as const) {
       if (!value[key])
         context.addIssue({
