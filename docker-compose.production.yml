@@ -1,0 +1,21 @@
+services:
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    env_file: .env
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bingo-api.rule=Host(`bingo.landminentester.de`) && PathPrefix(`/api`)
+      - traefik.http.services.bingo-api.loadbalancer.server.port=3000
+    networks: [traefik, internal]
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bingo-web.rule=Host(`bingo.landminentester.de`)
+      - traefik.http.services.bingo-web.loadbalancer.server.port=80
+    networks: [traefik]
+networks:
+  traefik: { external: true }
+  internal: { internal: true }
