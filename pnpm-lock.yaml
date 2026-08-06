@@ -26,6 +26,9 @@ importers:
       '@prisma/client':
         specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      '@twitch-bingo/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       fastify:
         specifier: ^5.5.0
         version: 5.11.2
