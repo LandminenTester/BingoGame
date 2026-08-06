@@ -28,16 +28,20 @@ export class LobbyStore {
   async joinLobby(code: string, twitchUserId: string) {
     const lobby = await db.lobby.findUnique({ where: { code: code.toUpperCase() }, include: { template: { include: { fields: { orderBy: { position: 'asc' } } } }, participants: true } });
     if (!lobby) throw new Error('Lobby not found.');
+    if (lobby.status === 'running' && !lobby.allowLateJoin) throw new Error('Late joining is disabled for this lobby.');
+    if (['completed', 'cancelled'].includes(lobby.status)) throw new Error('This lobby is no longer available.');
     if (lobby.participants.length >= lobby.maxParticipants) throw new Error('Lobby is full.');
     const user = await ensureUser(twitchUserId);
     const existing = await db.lobbyParticipant.findUnique({ where: { lobbyId_userId: { lobbyId: lobby.id, userId: user.id } } });
     if (existing) throw new Error('Already joined.');
     const fieldOrder = shuffleCard(lobby.template.fields);
+    const events = lobby.gameMode === 'streamer_controlled' ? await db.lobbyEvent.findMany({ where: { lobbyId: lobby.id }, orderBy: { createdAt: 'asc' } }) : [];
+    const confirmed = new Set<string>(); for (const event of events) event.completed ? confirmed.add(event.templateFieldId) : confirmed.delete(event.templateFieldId);
     return db.lobbyParticipant.create({
       data: {
         lobbyId: lobby.id,
         userId: user.id,
-        card: { create: { fields: { create: fieldOrder.map((field, position) => ({ templateFieldId: field.id, position })) } } },
+        card: { create: { fields: { create: fieldOrder.map((field, position) => ({ templateFieldId: field.id, position, completedAt: confirmed.has(field.id) ? new Date() : undefined, confirmedByHost: confirmed.has(field.id) })) } } },
       },
       include: { card: { include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } } } },
     });
