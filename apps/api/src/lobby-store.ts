@@ -67,6 +67,12 @@ export class LobbyStore {
   async leaderboard(lobbyId: string) {
     return db.bingoResult.findMany({ where: { lobbyId }, include: { participant: { include: { user: true } } }, orderBy: { placement: 'asc' } });
   }
+  async setLobbyStatus(lobbyId: string, hostTwitchUserId: string, status: 'open' | 'running' | 'paused' | 'completed' | 'cancelled') {
+    const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
+    if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId) throw new Error('Only the host can change lobby status.');
+    const now = new Date();
+    return db.lobby.update({ where: { id: lobbyId }, data: { status, startedAt: status === 'running' && !lobby.startedAt ? now : lobby.startedAt, endedAt: ['completed', 'cancelled'].includes(status) ? now : null } });
+  }
   private async recordResult(participantId: string) {
     const participant = await db.lobbyParticipant.findUnique({ where: { id: participantId }, include: { card: { include: { fields: true } }, lobby: true } });
     if (!participant?.card) return null;

@@ -85,6 +85,11 @@ export function buildApp() {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
     return store.leaderboard(lobbyId);
   });
+  app.post('/api/lobbies/:lobbyId/status', async (request, reply) => {
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params); const { status } = z.object({ status: z.enum(['open', 'running', 'paused', 'completed', 'cancelled']) }).parse(request.body);
+    try { const lobby = await store.setLobbyStatus(lobbyId, user.id, status); broadcast(lobbyId, { type: 'lobby.status_updated', status }); return lobby; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+  });
   app.get('/api/history/hosted/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
     return db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true }, orderBy: { createdAt: 'desc' } });

@@ -35,3 +35,8 @@ export function connectLobbyEvents(lobbyId: string, onEvent: (event: { type: str
   socket.addEventListener('message', (message) => { try { onEvent(JSON.parse(message.data)); } catch { /* ignore invalid events */ } });
   return socket;
 }
+
+export async function setLobbyStatus(lobbyId: string, status: 'running' | 'paused' | 'completed'): Promise<void> {
+  const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/status`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) });
+  if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not update lobby.' })); throw new Error(body.error); }
+}

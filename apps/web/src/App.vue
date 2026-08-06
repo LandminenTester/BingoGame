@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, type CurrentUser } from './api';
+import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, setLobbyStatus, type CurrentUser } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -67,6 +67,11 @@ async function confirmSelectedTask() {
   try { await confirmLobbyTask(activeLobbyId.value, fieldId, true); const next = new Set(marked.value); next.add(selectedTaskIndex.value); marked.value = next; }
   catch (error) { joinError.value = (error as Error).message; }
 }
+async function toggleSessionPause() {
+  if (!activeLobbyId.value) { sessionPaused.value = !sessionPaused.value; return; }
+  const paused = !sessionPaused.value;
+  try { await setLobbyStatus(activeLobbyId.value, paused ? 'paused' : 'running'); sessionPaused.value = paused; } catch (error) { joinError.value = (error as Error).message; }
+}
 </script>
 
 <template>
@@ -91,7 +96,7 @@ async function confirmSelectedTask() {
       </header>
 
       <section v-if="view === 'dashboard'" class="dashboard">
-        <div class="session-heading"><div><p class="eyebrow">{{ t('runningMode') }}</p><h1>{{ t('sessionTitle').split('\n')[0] }}<br /><em>{{ t('sessionTitle').split('\n')[1] }}</em></h1><p class="muted">{{ t('sessionDescription') }}</p></div><div class="session-actions"><button class="button secondary" @click="sessionPaused = !sessionPaused">{{ sessionPaused ? t('resume') : t('pause') }}</button><button class="button">{{ t('endSession') }}</button></div></div>
+        <div class="session-heading"><div><p class="eyebrow">{{ t('runningMode') }}</p><h1>{{ t('sessionTitle').split('\n')[0] }}<br /><em>{{ t('sessionTitle').split('\n')[1] }}</em></h1><p class="muted">{{ t('sessionDescription') }}</p></div><div class="session-actions"><button class="button secondary" @click="toggleSessionPause">{{ sessionPaused ? t('resume') : t('pause') }}</button><button class="button" @click="activeLobbyId && setLobbyStatus(activeLobbyId, 'completed')">{{ t('endSession') }}</button></div></div>
         <div class="signal-strip"><span class="pulse"></span><b>{{ sessionPaused ? t('sessionPaused') : t('signalOpen') }}</b><span>{{ t('firstLine') }}</span><button @click="copyCode">{{ t('code') }} <strong>{{ code }}</strong> · {{ copied ? t('copied') : t('copy') }}</button></div>
         <div class="board-layout">
           <section class="board-section"><div class="section-label"><span>{{ t('yourCard') }}</span><b>{{ completion }}/25 {{ t('completed') }}</b></div><div class="bingo-board" :aria-label="t('yourCard')">
