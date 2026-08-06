@@ -8,6 +8,7 @@ RUN corepack enable && pnpm install --frozen-lockfile && pnpm --filter @twitch-b
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+RUN corepack enable
 COPY --from=build /app /app
 USER node
 EXPOSE 3000
