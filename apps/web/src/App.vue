@@ -49,6 +49,7 @@ const cardFieldIds = ref<string[]>([]);
 const templateFieldIds = ref<string[]>([]);
 const activeLobbyId = ref<string | null>(null);
 const activeLobbyStatus = ref<'open' | 'running' | 'paused' | 'completed' | null>(null);
+const activeGameMode = ref<'individual' | 'streamer_controlled' | null>(null);
 const selectedTaskIndex = ref(0);
 let eventSocket: WebSocket | undefined;
 const currentUser = ref<CurrentUser | null>(null);
@@ -246,6 +247,7 @@ async function submitLobby() {
     const joined = await joinLobbyRequest(lobby.code, lobbyPassword.value || undefined);
     activeLobbyId.value = lobby.id;
     activeLobbyStatus.value = 'open';
+    activeGameMode.value = lobbyMode.value;
     code.value = lobby.code;
     cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? [];
     templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? [];
@@ -269,6 +271,7 @@ function subscribeToLobby(lobbyId: string) {
         (entry: any) => entry.user?.twitchUserId === currentUser.value?.id,
       );
       const fields = participant?.card?.fields;
+      activeGameMode.value = event.lobby?.gameMode ?? activeGameMode.value;
       if (!fields) return;
       cardFieldIds.value = fields.map((field: any) => field.id);
       templateFieldIds.value = fields.map((field: any) => field.templateField.id);
@@ -450,7 +453,7 @@ async function toggleSessionPause() {
             <p class="board-note">{{ t('mockMode') }}</p>
           </section>
           <aside class="right-rail">
-            <section class="panel control-panel">
+            <section v-if="activeGameMode === 'streamer_controlled'" class="panel control-panel">
               <p class="eyebrow">{{ t('hostConsole') }}</p>
               <h2>{{ t('confirmEvent') }}</h2>
               <select v-model="selectedTaskIndex" :aria-label="t('confirmEvent')">
