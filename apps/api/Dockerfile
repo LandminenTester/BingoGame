@@ -1,5 +1,6 @@
 FROM node:24-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache python3 make g++
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api ./apps/api
 COPY packages/contracts ./packages/contracts
