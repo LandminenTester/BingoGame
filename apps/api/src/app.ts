@@ -24,7 +24,10 @@ export function buildApp() {
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
-  app.get('/ready', async () => ({ status: 'ready', dependencies: { database: 'not-configured' } }));
+  app.get('/ready', async (_request, reply) => {
+    try { await db.$queryRaw`SELECT 1`; return { status: 'ready', dependencies: { database: 'connected' } }; }
+    catch { return reply.code(503).send({ status: 'not-ready', dependencies: { database: 'unavailable' } }); }
+  });
   app.get('/api/auth/twitch/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (_request, reply) => {
     const clientId = process.env.TWITCH_CLIENT_ID;
     const redirectUri = process.env.TWITCH_REDIRECT_URI;

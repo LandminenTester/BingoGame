@@ -10,4 +10,9 @@ describe('health endpoints', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ status: 'ok' });
   });
+
+  it('reports database readiness', async () => {
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+    expect([200, 503]).toContain(response.statusCode);
+  });
 });
