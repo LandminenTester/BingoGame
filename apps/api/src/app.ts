@@ -95,13 +95,37 @@ export function buildApp() {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
     return db.apiKey.findMany({ where: { user: { twitchUserId: userId } }, select: { id: true, name: true, scopes: true, createdAt: true, expiresAt: true, lastUsedAt: true, revokedAt: true } });
   });
+  app.post('/api/api-keys/:id/revoke', async (request, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    const key = await db.apiKey.findUnique({ where: { id } }); if (!key) return reply.code(404).send({ error: 'API key not found.' });
+    return db.apiKey.update({ where: { id }, data: { revokedAt: new Date() }, select: { id: true, revokedAt: true } });
+  });
+  app.post('/api/api-keys/:id/regenerate', async (request, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    const key = await db.apiKey.findUnique({ where: { id } }); if (!key) return reply.code(404).send({ error: 'API key not found.' });
+    const rawKey = generateApiKey(); const updated = await db.apiKey.update({ where: { id }, data: { keyHash: hashApiKey(rawKey), revokedAt: null, lastUsedAt: null } });
+    return { id: updated.id, key: rawKey, scopes: updated.scopes, expiresAt: updated.expiresAt };
+  });
+  const readApiKey = async (request: { headers: Record<string, string | string[] | undefined> }, channelId: string, scope: string) => {
+    const rawKey = request.headers['x-api-key']; if (typeof rawKey !== 'string') throw new Error('Missing API key.');
+    const key = await db.apiKey.findUnique({ where: { keyHash: hashApiKey(rawKey) }, include: { user: true } });
+    if (!key || key.user.twitchUserId !== channelId || key.revokedAt || (key.expiresAt && key.expiresAt < new Date()) || !key.scopes.includes(scope)) throw new Error('Invalid API key.');
+    await db.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }); return key;
+  };
   app.get('/api/v1/channels/:channelId/session', async (request, reply) => {
     const { channelId } = z.object({ channelId: z.string() }).parse(request.params);
-    const rawKey = request.headers['x-api-key']; if (typeof rawKey !== 'string') return reply.code(401).send({ error: 'Missing API key.' });
-    const key = await db.apiKey.findUnique({ where: { keyHash: hashApiKey(rawKey) }, include: { user: true } });
-    if (!key || key.user.twitchUserId !== channelId || key.revokedAt || (key.expiresAt && key.expiresAt < new Date()) || !key.scopes.includes('session:read')) return reply.code(403).send({ error: 'Invalid API key.' });
-    await db.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+    let key; try { key = await readApiKey(request, channelId, 'session:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     return db.lobby.findFirst({ where: { hostId: key.userId, status: { in: ['open', 'running', 'paused'] } }, orderBy: { createdAt: 'desc' }, include: { template: true, _count: { select: { participants: true } } } });
+  });
+  app.get('/api/v1/channels/:channelId/statistics', async (request, reply) => {
+    const { channelId } = z.object({ channelId: z.string() }).parse(request.params); try { await readApiKey(request, channelId, 'statistics:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: channelId } }, include: { _count: { select: { participants: true } }, results: true } });
+    return { totalSessions: lobbies.length, totalParticipants: lobbies.reduce((sum, lobby) => sum + lobby._count.participants, 0), completedCards: lobbies.reduce((sum, lobby) => sum + lobby.results.length, 0) };
+  });
+  app.get('/api/v1/lobbies/:lobbyId/leaderboard', async (request, reply) => {
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params); const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } }); if (!lobby) return reply.code(404).send({ error: 'Lobby not found.' });
+    try { await readApiKey(request, lobby.host.twitchUserId, 'leaderboard:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    return store.leaderboard(lobbyId);
   });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
