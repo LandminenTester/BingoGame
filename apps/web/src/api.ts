@@ -17,3 +17,8 @@ export async function joinLobby(code: string): Promise<JoinedLobby> {
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not join lobby.' })); throw new Error(body.error); }
   return response.json();
 }
+
+export async function markCardField(lobbyId: string, fieldId: string, completed: boolean): Promise<void> {
+  const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/cards/${fieldId}`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ completed }) });
+  if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not update card.' })); throw new Error(body.error); }
+}

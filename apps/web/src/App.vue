@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, getCurrentUser, joinLobby as joinLobbyRequest, logout, type CurrentUser } from './api';
+import { beginTwitchLogin, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, type CurrentUser } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -15,6 +15,8 @@ const copied = ref(false);
 const sessionPaused = ref(false);
 const marked = ref(new Set<number>([0, 2, 5, 8, 11, 13, 17, 22]));
 const boardTasks = ref([...tasks]);
+const cardFieldIds = ref<string[]>([]);
+const activeLobbyId = ref<string | null>(null);
 const currentUser = ref<CurrentUser | null>(null);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
@@ -27,10 +29,13 @@ onMounted(async () => { document.documentElement.dataset.theme = theme.value; cu
 watch(locale, (value) => localStorage.setItem('bingo-locale', value));
 watch(theme, (value) => { localStorage.setItem('bingo-theme', value); document.documentElement.dataset.theme = value; });
 
-function toggleField(index: number) {
+async function toggleField(index: number) {
   const next = new Set(marked.value);
-  next.has(index) ? next.delete(index) : next.add(index);
-  marked.value = next;
+  const completed = !next.has(index);
+  if (activeLobbyId.value && cardFieldIds.value[index]) {
+    try { await markCardField(activeLobbyId.value, cardFieldIds.value[index], completed); } catch (error) { joinError.value = (error as Error).message; return; }
+  }
+  completed ? next.add(index) : next.delete(index); marked.value = next;
 }
 function copyCode() {
   void navigator.clipboard?.writeText(code.value);
@@ -41,7 +46,7 @@ async function submitJoin() {
   const cleanCode = joinCode.value.trim().toUpperCase();
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
   if (!currentUser.value) { beginTwitchLogin(); return; }
-  try { const joined = await joinLobbyRequest(cleanCode); boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
+  try { const joined = await joinLobbyRequest(cleanCode); activeLobbyId.value = joined.lobbyId; cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? []; boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
   catch (error) { joinError.value = (error as Error).message; }
 }
 async function signOut() { await logout(); currentUser.value = null; }
