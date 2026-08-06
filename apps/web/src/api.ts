@@ -46,3 +46,10 @@ export async function setLobbyStatus(lobbyId: string, status: 'running' | 'pause
   const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/status`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status }) });
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not update lobby.' })); throw new Error(body.error); }
 }
+export interface LeaderboardEntry { placement: number; participantId: string; displayName: string; completedAt?: string; completedFields: number; isWinner: boolean; }
+export async function getLeaderboard(lobbyId: string): Promise<LeaderboardEntry[]> {
+  const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/leaderboard`, { credentials: 'include' });
+  if (!response.ok) throw new Error('Could not load leaderboard.');
+  const rows = await response.json();
+  return rows.map((row: any) => ({ placement: row.placement, participantId: row.participantId, displayName: row.participant.user.displayName, completedAt: row.completedAt, completedFields: row.completedFields, isWinner: row.isWinner }));
+}

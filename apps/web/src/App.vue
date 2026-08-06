@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, listTemplates, logout, markCardField, setLobbyStatus, type CurrentUser, type TemplateSummary } from './api';
+import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, getLeaderboard, joinLobby as joinLobbyRequest, listTemplates, logout, markCardField, setLobbyStatus, type CurrentUser, type LeaderboardEntry, type TemplateSummary } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -22,6 +22,7 @@ const selectedTaskIndex = ref(0);
 let eventSocket: WebSocket | undefined;
 const currentUser = ref<CurrentUser | null>(null);
 const remoteTemplates = ref<TemplateSummary[]>([]);
+const liveRankings = ref<LeaderboardEntry[]>([]);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
 const nav: { id: View; label: TranslationKey }[] = [
@@ -52,7 +53,7 @@ async function submitJoin() {
   const cleanCode = joinCode.value.trim().toUpperCase();
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
   if (!currentUser.value) { beginTwitchLogin(); return; }
-  try { const joined = await joinLobbyRequest(cleanCode); activeLobbyId.value = joined.lobbyId; cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? []; templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? []; boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); subscribeToLobby(joined.lobbyId); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
+  try { const joined = await joinLobbyRequest(cleanCode); activeLobbyId.value = joined.lobbyId; cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? []; templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? []; boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); liveRankings.value = await getLeaderboard(joined.lobbyId); subscribeToLobby(joined.lobbyId); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
   catch (error) { joinError.value = (error as Error).message; }
 }
 async function signOut() { await logout(); currentUser.value = null; }
@@ -111,7 +112,7 @@ async function toggleSessionPause() {
             <button v-for="(task, index) in boardTasks" :key="task" class="tile" :class="{ marked: marked.has(index) }" :aria-pressed="marked.has(index)" @click="toggleField(index)"><span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span><span>{{ task }}</span><i>{{ marked.has(index) ? '✓' : '+' }}</i></button>
           </div><p class="board-note">{{ t('mockMode') }}</p></section>
           <aside class="right-rail"><section class="panel control-panel"><p class="eyebrow">{{ t('hostConsole') }}</p><h2>{{ t('confirmEvent') }}</h2><select v-model="selectedTaskIndex" :aria-label="t('confirmEvent')"><option v-for="(task, index) in boardTasks" :key="task" :value="index">{{ task }}</option></select><button class="button wide" @click="confirmSelectedTask">{{ t('confirm') }}</button><small>{{ t('syncHint') }}</small></section>
-            <section class="panel"><div class="panel-heading"><h2>{{ t('leaderboard') }}</h2><button class="link">{{ t('viewAll') }}</button></div><ol class="ranking"><li v-for="entry in rankings" :key="entry.participantId" :class="{ winner: entry.isWinner }"><b>{{ entry.placement }}</b><span class="avatar mini">{{ entry.displayName.slice(0, 2).toUpperCase() }}</span><span>{{ entry.displayName }}<small>{{ entry.completedAt || t('inProgress') }}</small></span><strong>{{ entry.completedFields }}/25</strong></li></ol></section>
+            <section class="panel"><div class="panel-heading"><h2>{{ t('leaderboard') }}</h2><button class="link">{{ t('viewAll') }}</button></div><ol class="ranking"><li v-for="entry in (liveRankings.length ? liveRankings : rankings)" :key="entry.participantId" :class="{ winner: entry.isWinner }"><b>{{ entry.placement }}</b><span class="avatar mini">{{ entry.displayName.slice(0, 2).toUpperCase() }}</span><span>{{ entry.displayName }}<small>{{ entry.completedAt || t('inProgress') }}</small></span><strong>{{ entry.completedFields }}/25</strong></li></ol></section>
           </aside>
         </div>
       </section>
