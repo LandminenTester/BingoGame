@@ -3,6 +3,8 @@ import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId } from './auth.js';
@@ -22,6 +24,8 @@ export function buildApp() {
   void app.register(websocket);
   void app.register(helmet, { contentSecurityPolicy: false });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  void app.register(swagger, { openapi: { info: { title: 'Twitch Bingo API', version: 'v1', description: 'Read API for Twitch Bingo integrations.' }, servers: [{ url: '/api/v1' }] } });
+  void app.register(swaggerUi, { routePrefix: '/documentation' });
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
   app.get('/ready', async (_request, reply) => {
