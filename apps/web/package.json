@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @twitch-bingo/contracts build",
+    "prebuild": "pnpm --filter @twitch-bingo/contracts build",
+    "prelint": "pnpm --filter @twitch-bingo/contracts build",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "lint": "vue-tsc --noEmit",
