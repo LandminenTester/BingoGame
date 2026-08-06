@@ -185,3 +185,60 @@ export async function getLeaderboard(lobbyId: string): Promise<LeaderboardEntry[
     isWinner: row.isWinner,
   }));
 }
+export interface HistoryLobby {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  endedAt?: string | null;
+  _count: { participants: number };
+  results: Array<{ placement: number }>;
+}
+export interface ChannelStatistics {
+  totalSessions: number;
+  totalParticipants: number;
+  completedCards: number;
+}
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+}
+export async function getHistory(userId: string): Promise<HistoryLobby[]> {
+  return requestJson(
+    `/api/history/hosted/${userId}`,
+    { method: 'GET' },
+    'Could not load session history.',
+  );
+}
+export async function getStatistics(userId: string): Promise<ChannelStatistics> {
+  return requestJson(`/api/statistics/${userId}`, { method: 'GET' }, 'Could not load statistics.');
+}
+export async function resetStatistics(): Promise<{ deletedLobbyCount: number }> {
+  return requestJson(
+    '/api/statistics/reset',
+    { method: 'POST', body: JSON.stringify({ confirm: true }) },
+    'Could not reset statistics.',
+  );
+}
+export async function listApiKeys(userId: string): Promise<ApiKeySummary[]> {
+  return requestJson(`/api/api-keys/${userId}`, { method: 'GET' }, 'Could not load API keys.');
+}
+export async function createApiKey(
+  name: string,
+  scopes: string[],
+): Promise<ApiKeySummary & { key: string }> {
+  return requestJson(
+    '/api/api-keys',
+    { method: 'POST', body: JSON.stringify({ name, scopes }) },
+    'Could not create API key.',
+  );
+}
+export async function revokeApiKey(id: string): Promise<void> {
+  return requestJson(`/api/api-keys/${id}/revoke`, { method: 'POST' }, 'Could not revoke API key.');
+}

@@ -8,14 +8,23 @@ import {
   connectLobbyEvents,
   createLobby,
   createTemplate,
+  createApiKey,
   getCurrentUser,
   getLeaderboard,
+  getHistory,
+  getStatistics,
   joinLobby as joinLobbyRequest,
   listTemplates,
+  listApiKeys,
   logout,
   markCardField,
+  resetStatistics,
+  revokeApiKey,
   setLobbyStatus,
   type CurrentUser,
+  type ApiKeySummary,
+  type ChannelStatistics,
+  type HistoryLobby,
   type LeaderboardEntry,
   type TemplateSummary,
 } from './api';
@@ -51,6 +60,11 @@ const lobbyTemplateId = ref('');
 const lobbyMode = ref<'individual' | 'streamer_controlled'>('streamer_controlled');
 const lobbyWin = ref<'first_line' | 'full_card'>('first_line');
 const lobbyLimit = ref(100);
+const history = ref<HistoryLobby[]>([]);
+const statistics = ref<ChannelStatistics | null>(null);
+const apiKeys = ref<ApiKeySummary[]>([]);
+const apiKeyName = ref('Overlay integration');
+const shownApiKey = ref('');
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
 const nav: { id: View; label: TranslationKey }[] = [
@@ -67,7 +81,12 @@ onMounted(async () => {
   currentUser.value = await getCurrentUser().catch(() => null);
 });
 watch(view, async (value) => {
+  if (!currentUser.value) return;
   if (value === 'templates') remoteTemplates.value = await listTemplates().catch(() => []);
+  if (value === 'history') history.value = await getHistory(currentUser.value.id).catch(() => []);
+  if (value === 'stats')
+    statistics.value = await getStatistics(currentUser.value.id).catch(() => null);
+  if (value === 'settings') apiKeys.value = await listApiKeys(currentUser.value.id).catch(() => []);
 });
 onBeforeUnmount(() => eventSocket?.close());
 watch(locale, (value) => localStorage.setItem('bingo-locale', value));
@@ -127,6 +146,38 @@ async function submitJoin() {
 async function signOut() {
   await logout();
   currentUser.value = null;
+}
+async function createIntegrationKey() {
+  try {
+    const created = await createApiKey(apiKeyName.value, [
+      'session:read',
+      'lobby:read',
+      'leaderboard:read',
+      'statistics:read',
+    ]);
+    shownApiKey.value = created.key;
+    if (currentUser.value) apiKeys.value = await listApiKeys(currentUser.value.id);
+  } catch (error) {
+    templateError.value = (error as Error).message;
+  }
+}
+async function disableApiKey(id: string) {
+  try {
+    await revokeApiKey(id);
+    if (currentUser.value) apiKeys.value = await listApiKeys(currentUser.value.id);
+  } catch (error) {
+    templateError.value = (error as Error).message;
+  }
+}
+async function clearStatistics() {
+  if (!window.confirm('Alle gehosteten Sessions und Statistiken wirklich löschen?')) return;
+  try {
+    await resetStatistics();
+    history.value = [];
+    statistics.value = { totalSessions: 0, totalParticipants: 0, completedCards: 0 };
+  } catch (error) {
+    templateError.value = (error as Error).message;
+  }
 }
 async function refreshTemplates() {
   remoteTemplates.value = await listTemplates();
@@ -474,9 +525,60 @@ async function toggleSessionPause() {
             <button class="button">Lobby erstellen</button>
           </form>
         </template>
-        <p v-else-if="view === 'history'">{{ t('historyCopy') }}</p>
-        <p v-else-if="view === 'stats'">{{ t('statsCopy') }}</p>
-        <p v-else>{{ t('settingsCopy') }}</p>
+        <template v-else-if="view === 'history'"
+          ><p>{{ t('historyCopy') }}</p>
+          <div class="management-list">
+            <article v-for="session in history" :key="session.id">
+              <b>{{ session.name }}</b
+              ><small
+                >{{ session.code }} · {{ session.status }} ·
+                {{ session._count.participants }} Teilnehmer ·
+                {{ session.results.length }} Abschlüsse</small
+              >
+            </article>
+            <p v-if="!history.length" class="muted">Noch keine gehosteten Sessions.</p>
+          </div></template
+        >
+        <template v-else-if="view === 'stats'"
+          ><p>{{ t('statsCopy') }}</p>
+          <div class="stat-grid">
+            <article>
+              <b>{{ statistics?.totalSessions ?? 0 }}</b
+              ><span>Sessions</span>
+            </article>
+            <article>
+              <b>{{ statistics?.totalParticipants ?? 0 }}</b
+              ><span>Teilnehmer</span>
+            </article>
+            <article>
+              <b>{{ statistics?.completedCards ?? 0 }}</b
+              ><span>Gewonnene Karten</span>
+            </article>
+          </div>
+          <button class="button secondary" @click="clearStatistics">
+            Statistiken und Sessions zurücksetzen
+          </button></template
+        >
+        <template v-else
+          ><p>{{ t('settingsCopy') }}</p>
+          <p v-if="templateError" class="error">{{ templateError }}</p>
+          <form class="api-key-form" @submit.prevent="createIntegrationKey">
+            <label>API-Key Name<input v-model="apiKeyName" required maxlength="100" /></label
+            ><button class="button">API-Key erzeugen</button>
+          </form>
+          <p v-if="shownApiKey" class="secret-key"><b>Einmalig sichtbar:</b> {{ shownApiKey }}</p>
+          <div class="management-list">
+            <article v-for="key in apiKeys" :key="key.id">
+              <b>{{ key.name }}</b
+              ><small
+                >{{ key.scopes.join(', ') }} · {{ key.revokedAt ? 'widerrufen' : 'aktiv' }}</small
+              ><button v-if="!key.revokedAt" class="link" @click="disableApiKey(key.id)">
+                Widerrufen
+              </button>
+            </article>
+            <p v-if="!apiKeys.length" class="muted">Noch keine API-Schlüssel.</p>
+          </div></template
+        >
         <div v-if="view !== 'templates'" class="placeholder-grid">
           <div v-for="item in 3" :key="item" class="ghost-panel">
             <span></span><span></span><span></span>

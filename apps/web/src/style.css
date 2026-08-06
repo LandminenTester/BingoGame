@@ -563,6 +563,68 @@ h2 {
 .lobby-form .button {
   width: max-content;
 }
+.management-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+.management-list article {
+  display: grid;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.management-list small {
+  color: var(--muted);
+  font: 10px 'DM Mono';
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 24px 0;
+}
+.stat-grid article {
+  padding: 18px;
+  background: var(--surface-2);
+  display: grid;
+  gap: 5px;
+}
+.stat-grid b {
+  font: 700 34px 'Barlow Condensed';
+  color: var(--accent-soft);
+}
+.stat-grid span {
+  color: var(--muted);
+  font: 10px 'DM Mono';
+}
+.api-key-form {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  margin-top: 20px;
+}
+.api-key-form label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  font: 10px 'DM Mono';
+  color: var(--muted);
+}
+.api-key-form input {
+  background: var(--ink);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 9px;
+}
+.secret-key {
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  color: var(--accent-soft) !important;
+  font: 11px 'DM Mono';
+}
 @media (prefers-reduced-motion: no-preference) {
   .pulse {
     animation: pulse 1.7s infinite;
