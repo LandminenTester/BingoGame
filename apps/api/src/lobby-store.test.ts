@@ -18,6 +18,11 @@ describe('lobby store', () => {
     });
     const joined = await store.joinLobby(lobby.code, 'viewer-1');
     expect(joined.card?.fields).toHaveLength(25);
+    const rejoined = await store.joinLobby(lobby.code, 'viewer-1');
+    expect(rejoined.id).toBe(joined.id);
+    expect(rejoined.card?.fields.map((field) => field.id)).toEqual(
+      joined.card?.fields.map((field) => field.id),
+    );
   });
 
   it('stores the host late-join setting', async () => {

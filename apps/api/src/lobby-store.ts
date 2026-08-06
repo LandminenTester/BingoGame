@@ -145,12 +145,17 @@ export class LobbyStore {
       throw new Error('Late joining is disabled for this lobby.');
     if (['completed', 'cancelled'].includes(lobby.status))
       throw new Error('This lobby is no longer available.');
-    if (lobby.participants.length >= lobby.maxParticipants) throw new Error('Lobby is full.');
     const user = await ensureUser(twitchUserId);
     const existing = await db.lobbyParticipant.findUnique({
       where: { lobbyId_userId: { lobbyId: lobby.id, userId: user.id } },
+      include: {
+        card: {
+          include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } },
+        },
+      },
     });
-    if (existing) throw new Error('Already joined.');
+    if (existing) return existing;
+    if (lobby.participants.length >= lobby.maxParticipants) throw new Error('Lobby is full.');
     const fieldOrder = shuffleCard(lobby.template.fields);
     const events =
       lobby.gameMode === 'streamer_controlled'
