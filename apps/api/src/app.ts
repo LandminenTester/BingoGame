@@ -1,6 +1,8 @@
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId } from './auth.js';
@@ -17,10 +19,12 @@ export function buildApp() {
   void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
   void app.register(cookie);
   void app.register(websocket);
+  void app.register(helmet, { contentSecurityPolicy: false });
+  void app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
   app.get('/ready', async () => ({ status: 'ready', dependencies: { database: 'not-configured' } }));
-  app.get('/api/auth/twitch/login', async (_request, reply) => {
+  app.get('/api/auth/twitch/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (_request, reply) => {
     const clientId = process.env.TWITCH_CLIENT_ID;
     const redirectUri = process.env.TWITCH_REDIRECT_URI;
     if (!clientId || !redirectUri) return reply.code(503).send({ error: 'Twitch OAuth is not configured.' });
@@ -57,7 +61,7 @@ export function buildApp() {
     const input = z.object({ name: z.string().min(1).max(100), templateId: z.string(), hostId: z.string().min(1), gameMode: z.enum(['individual', 'streamer_controlled']), winningCondition: z.enum(['first_line', 'full_card']), maxParticipants: z.number().int().min(1).max(1000) }).parse(request.body);
     try { return reply.code(201).send(await store.createLobby(input)); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
-  app.post('/api/lobbies/:code/join', async (request, reply) => {
+  app.post('/api/lobbies/:code/join', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { code } = z.object({ code: z.string().length(6) }).parse(request.params);
     const { userId } = z.object({ userId: z.string().min(1) }).parse(request.body);
     try { return await store.joinLobby(code, userId); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
@@ -112,7 +116,7 @@ export function buildApp() {
     if (!key || key.user.twitchUserId !== channelId || key.revokedAt || (key.expiresAt && key.expiresAt < new Date()) || !key.scopes.includes(scope)) throw new Error('Invalid API key.');
     await db.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }); return key;
   };
-  app.get('/api/v1/channels/:channelId/session', async (request, reply) => {
+  app.get('/api/v1/channels/:channelId/session', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { channelId } = z.object({ channelId: z.string() }).parse(request.params);
     let key; try { key = await readApiKey(request, channelId, 'session:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     return db.lobby.findFirst({ where: { hostId: key.userId, status: { in: ['open', 'running', 'paused'] } }, orderBy: { createdAt: 'desc' }, include: { template: true, _count: { select: { participants: true } } } });
