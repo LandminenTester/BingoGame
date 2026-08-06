@@ -39,4 +39,24 @@ describe('lobby store', () => {
       store.joinLobby(lobby.code, 'viewer-password', 'safe-password'),
     ).resolves.toMatchObject({ lobbyId: lobby.id });
   });
+
+  it('does not permit changing a template once a lobby uses it', async () => {
+    const store = new LobbyStore();
+    const template = await store.createTemplate({
+      name: 'Immutable',
+      fields,
+      authorId: 'immutable-host',
+    });
+    await store.createLobby({
+      name: 'Uses template',
+      templateId: template.id,
+      hostId: 'immutable-host',
+      gameMode: 'individual',
+      winningCondition: 'first_line',
+      maxParticipants: 2,
+    });
+    await expect(
+      store.updateTemplate(template.id, 'immutable-host', { name: 'Changed', fields }),
+    ).rejects.toThrow('cannot be edited');
+  });
 });

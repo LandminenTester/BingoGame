@@ -62,10 +62,12 @@ export class LobbyStore {
       throw new Error('Templates require exactly 25 non-empty fields.');
     const template = await db.bingoTemplate.findUnique({
       where: { id },
-      include: { author: true },
+      include: { author: true, _count: { select: { lobbies: true } } },
     });
     if (!template || template.author?.twitchUserId !== twitchUserId)
       throw new Error('Template not found or forbidden.');
+    if (template._count.lobbies)
+      throw new Error('Templates used by a lobby cannot be edited. Duplicate it instead.');
     return db.$transaction(async (tx) => {
       await tx.bingoTemplateField.deleteMany({ where: { templateId: id } });
       return tx.bingoTemplate.update({
@@ -293,17 +295,36 @@ export class LobbyStore {
       return { won: false, completedFields: completed.size };
     const existing = await db.bingoResult.findUnique({ where: { participantId } });
     if (existing) return { won: true, result: existing };
-    const placement = (await db.bingoResult.count({ where: { lobbyId: participant.lobbyId } })) + 1;
-    const result = await db.bingoResult.create({
-      data: {
-        lobbyId: participant.lobbyId,
-        participantId,
-        placement,
-        completedAt: new Date(),
-        completedFields: completed.size,
-        isWinner: placement === 1,
-      },
-    });
-    return { won: true, result };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const placement =
+        (await db.bingoResult.count({ where: { lobbyId: participant.lobbyId } })) + 1;
+      try {
+        const result = await db.bingoResult.create({
+          data: {
+            lobbyId: participant.lobbyId,
+            participantId,
+            placement,
+            completedAt: new Date(),
+            completedFields: completed.size,
+            isWinner: placement === 1,
+          },
+        });
+        return { won: true, result };
+      } catch (error: unknown) {
+        const existingResult = await db.bingoResult.findUnique({ where: { participantId } });
+        if (existingResult) return { won: true, result: existingResult };
+        if (
+          !(
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'P2002'
+          ) ||
+          attempt === 2
+        )
+          throw error;
+      }
+    }
+    throw new Error('Could not record result.');
   }
 }
