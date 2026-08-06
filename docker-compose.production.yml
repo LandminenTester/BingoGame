@@ -1,7 +1,25 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: twitch_bingo
+      POSTGRES_USER: bingo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bingo -d twitch_bingo']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://bingo:${POSTGRES_PASSWORD}@postgres:5432/twitch_bingo?schema=public
+    depends_on:
+      postgres: { condition: service_healthy }
     restart: unless-stopped
     labels:
       - traefik.enable=true
@@ -19,3 +37,5 @@ services:
 networks:
   traefik: { external: true }
   internal: { internal: true }
+volumes:
+  postgres_data:
