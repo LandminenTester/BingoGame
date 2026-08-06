@@ -160,6 +160,11 @@ export function buildApp() {
     let key; try { key = await readApiKey(request, channelId, 'session:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     return db.lobby.findFirst({ where: { hostId: key.userId, status: { in: ['open', 'running', 'paused'] } }, orderBy: { createdAt: 'desc' }, include: { template: true, _count: { select: { participants: true } } } });
   });
+  app.get('/api/v1/channels/:channelId/lobbies', async (request, reply) => {
+    const { channelId } = z.object({ channelId: z.string() }).parse(request.params);
+    let key; try { key = await readApiKey(request, channelId, 'lobby:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    return db.lobby.findMany({ where: { hostId: key.userId, status: { in: ['draft', 'open', 'running', 'paused'] } }, orderBy: { createdAt: 'desc' }, select: { id: true, code: true, name: true, status: true, gameMode: true, winningCondition: true, createdAt: true, _count: { select: { participants: true } } } });
+  });
   app.get('/api/v1/channels/:channelId/statistics', async (request, reply) => {
     const { channelId } = z.object({ channelId: z.string() }).parse(request.params); try { await readApiKey(request, channelId, 'statistics:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: channelId } }, include: { _count: { select: { participants: true } }, results: true } });
