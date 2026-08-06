@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
+import { beginTwitchLogin, getCurrentUser, logout, type CurrentUser } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -13,6 +14,7 @@ const joinError = ref('');
 const copied = ref(false);
 const sessionPaused = ref(false);
 const marked = ref(new Set<number>([0, 2, 5, 8, 11, 13, 17, 22]));
+const currentUser = ref<CurrentUser | null>(null);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
 const nav: { id: View; label: TranslationKey }[] = [
@@ -20,7 +22,7 @@ const nav: { id: View; label: TranslationKey }[] = [
   { id: 'history', label: 'history' }, { id: 'stats', label: 'stats' }, { id: 'settings', label: 'settings' },
 ];
 
-onMounted(() => document.documentElement.dataset.theme = theme.value);
+onMounted(async () => { document.documentElement.dataset.theme = theme.value; currentUser.value = await getCurrentUser().catch(() => null); });
 watch(locale, (value) => localStorage.setItem('bingo-locale', value));
 watch(theme, (value) => { localStorage.setItem('bingo-theme', value); document.documentElement.dataset.theme = value; });
 
@@ -39,6 +41,7 @@ function submitJoin() {
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
   code.value = cleanCode; joinError.value = ''; view.value = 'dashboard';
 }
+async function signOut() { await logout(); currentUser.value = null; }
 </script>
 
 <template>
@@ -50,7 +53,7 @@ function submitJoin() {
           <span class="nav-dot"></span>{{ t(item.label) }}
         </button>
       </nav>
-      <div class="user-panel"><span class="avatar">PP</span><span><b>PixelPanda</b><small>{{ t('streamerAccount') }}</small></span><button class="more" :aria-label="t('accountOptions')">•••</button></div>
+      <div class="user-panel"><span class="avatar">{{ currentUser?.displayName.slice(0, 2).toUpperCase() ?? 'PP' }}</span><span><b>{{ currentUser?.displayName ?? 'PixelPanda' }}</b><small>{{ currentUser ? t('streamerAccount') : 'Twitch login required' }}</small></span><button v-if="currentUser" class="more" :aria-label="t('accountOptions')" @click="signOut">↪</button><button v-else class="more" :aria-label="t('accountOptions')" @click="beginTwitchLogin">↗</button></div>
     </aside>
 
     <section class="content">
