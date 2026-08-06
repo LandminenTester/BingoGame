@@ -15,4 +15,9 @@ describe('health endpoints', () => {
     const response = await app.inject({ method: 'GET', url: '/ready' });
     expect([200, 503]).toContain(response.statusCode);
   });
+
+  it('rejects unauthenticated mutations', async () => {
+    const response = await app.inject({ method: 'POST', url: '/api/templates', payload: { name: 'Test', fields: Array.from({ length: 25 }, (_, index) => `Field ${index}`) } });
+    expect(response.statusCode).toBe(401);
+  });
 });
