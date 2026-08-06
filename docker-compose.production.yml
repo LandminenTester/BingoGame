@@ -20,6 +20,11 @@ services:
       DATABASE_URL: postgresql://bingo:${POSTGRES_PASSWORD}@postgres:5432/twitch_bingo?schema=public
     depends_on:
       postgres: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     labels:
       - traefik.enable=true
@@ -33,6 +38,11 @@ services:
       - traefik.enable=true
       - traefik.http.routers.bingo-web.rule=Host(`bingo.landminentester.de`)
       - traefik.http.services.bingo-web.loadbalancer.server.port=80
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost/ >/dev/null 2>&1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks: [traefik]
 networks:
   traefik: { external: true }

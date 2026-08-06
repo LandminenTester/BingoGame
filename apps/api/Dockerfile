@@ -10,4 +10,4 @@ ENV NODE_ENV=production
 COPY --from=build /app /app
 USER node
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@twitch-bingo/api", "start"]
+CMD ["sh", "-c", "pnpm --filter @twitch-bingo/api exec prisma migrate deploy && pnpm --filter @twitch-bingo/api start"]
