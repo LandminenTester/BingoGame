@@ -14,6 +14,7 @@ export function buildApp() {
   const app = Fastify({ logger: true });
   const store = new LobbyStore();
   const sessions = new Map<string, { id: string; displayName: string; login: string; profileImageUrl?: string }>();
+  const sessionUser = (request: { cookies: Record<string, string | undefined> }) => sessions.get(request.cookies.session ?? '');
   const rooms = new Map<string, Set<{ readyState: number; send: (data: string) => void }>>();
   const broadcast = (lobbyId: string, event: unknown) => rooms.get(lobbyId)?.forEach((socket) => { if (socket.readyState === 1) socket.send(JSON.stringify(event)); });
   void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
@@ -54,27 +55,31 @@ export function buildApp() {
   app.post('/api/auth/logout', async (request, reply) => { sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send(); });
   app.get('/api/templates', async () => await store.listTemplates());
   app.post('/api/templates', async (request, reply) => {
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
-    try { return reply.code(201).send(await store.createTemplate(input)); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
+    try { return reply.code(201).send(await store.createTemplate({ ...input, authorId: user.id })); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies', async (request, reply) => {
-    const input = z.object({ name: z.string().min(1).max(100), templateId: z.string(), hostId: z.string().min(1), gameMode: z.enum(['individual', 'streamer_controlled']), winningCondition: z.enum(['first_line', 'full_card']), maxParticipants: z.number().int().min(1).max(1000) }).parse(request.body);
-    try { return reply.code(201).send(await store.createLobby(input)); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const input = z.object({ name: z.string().min(1).max(100), templateId: z.string(), gameMode: z.enum(['individual', 'streamer_controlled']), winningCondition: z.enum(['first_line', 'full_card']), maxParticipants: z.number().int().min(1).max(1000) }).parse(request.body);
+    try { return reply.code(201).send(await store.createLobby({ ...input, hostId: user.id })); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:code/join', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { code } = z.object({ code: z.string().length(6) }).parse(request.params);
-    const { userId } = z.object({ userId: z.string().min(1) }).parse(request.body);
-    try { return await store.joinLobby(code, userId); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    try { return await store.joinLobby(code, user.id); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:lobbyId/cards/:fieldId', async (request, reply) => {
     const { lobbyId, fieldId } = z.object({ lobbyId: z.string(), fieldId: z.string() }).parse(request.params);
-    const { userId, completed } = z.object({ userId: z.string(), completed: z.boolean() }).parse(request.body);
-    try { const result = await store.markPlayerField(lobbyId, userId, fieldId, completed); broadcast(lobbyId, { type: 'lobby.card_updated', fieldId, completed, result }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { completed } = z.object({ completed: z.boolean() }).parse(request.body);
+    try { const result = await store.markPlayerField(lobbyId, user.id, fieldId, completed); broadcast(lobbyId, { type: 'lobby.card_updated', fieldId, completed, result }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:lobbyId/tasks/:templateFieldId', async (request, reply) => {
     const { lobbyId, templateFieldId } = z.object({ lobbyId: z.string(), templateFieldId: z.string() }).parse(request.params);
-    const { hostId, completed } = z.object({ hostId: z.string(), completed: z.boolean() }).parse(request.body);
-    try { const result = await store.confirmLobbyTask(lobbyId, hostId, templateFieldId, completed); broadcast(lobbyId, { type: 'lobby.task_updated', templateFieldId, completed }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { completed } = z.object({ completed: z.boolean() }).parse(request.body);
+    try { const result = await store.confirmLobbyTask(lobbyId, user.id, templateFieldId, completed); broadcast(lobbyId, { type: 'lobby.task_updated', templateFieldId, completed }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.get('/api/lobbies/:lobbyId/leaderboard', async (request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
