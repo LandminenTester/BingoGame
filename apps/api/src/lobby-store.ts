@@ -34,6 +34,27 @@ async function ensureUser(id: string) {
 }
 
 export class LobbyStore {
+  async ensurePredefinedTemplates() {
+    const name = 'Stream Classic';
+    const existing = await db.bingoTemplate.findFirst({
+      where: { name, visibility: 'predefined', authorId: null },
+    });
+    if (existing) return existing;
+    return db.bingoTemplate.create({
+      data: {
+        name,
+        visibility: 'predefined',
+        tags: ['stream', 'classic'],
+        language: 'de',
+        fields: {
+          create: Array.from({ length: 25 }, (_, position) => ({
+            position,
+            label: `Stream-Moment ${position + 1}`,
+          })),
+        },
+      },
+    });
+  }
   async createTemplate(input: TemplateInput) {
     if (input.fields.length !== 25 || input.fields.some((field) => !field.trim()))
       throw new Error('Templates require exactly 25 non-empty fields.');
@@ -52,8 +73,8 @@ export class LobbyStore {
   listTemplates(twitchUserId?: string) {
     return db.bingoTemplate.findMany({
       where: twitchUserId
-        ? { OR: [{ visibility: 'public' }, { author: { twitchUserId } }] }
-        : { visibility: 'public' },
+        ? { OR: [{ visibility: { in: ['public', 'predefined'] } }, { author: { twitchUserId } }] }
+        : { visibility: { in: ['public', 'predefined'] } },
       include: { fields: { orderBy: { position: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });

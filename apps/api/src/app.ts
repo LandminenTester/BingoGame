@@ -69,6 +69,9 @@ export function buildApp() {
     },
   });
   void app.register(swaggerUi, { routePrefix: '/documentation' });
+  app.addHook('onReady', async () => {
+    await store.ensurePredefinedTemplates();
+  });
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
   app.get('/ready', async (_request, reply) => {
