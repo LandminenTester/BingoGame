@@ -22,14 +22,17 @@ import { hashLobbyPassword } from './password.js';
 export function buildApp() {
   const app = Fastify({ logger: true });
   const store = new LobbyStore();
+  const cookieSecret = process.env.SESSION_SECRET ?? 'development-only-session-secret';
   type SessionUser = { id: string; displayName: string; login: string; profileImageUrl?: string };
   const sessionUser = async (request: {
     cookies: Record<string, string | undefined>;
+    unsignCookie: (value: string) => { valid: boolean; value: string | null };
   }): Promise<SessionUser | null> => {
-    const token = request.cookies.session;
-    if (!token) return null;
+    const signedToken = request.cookies.session;
+    const token = signedToken ? request.unsignCookie(signedToken) : null;
+    if (!token?.valid || !token.value) return null;
     const session = await db.userSession.findUnique({
-      where: { tokenHash: hashSessionId(token) },
+      where: { tokenHash: hashSessionId(token.value) },
       include: { user: true },
     });
     if (!session) return null;
@@ -51,7 +54,7 @@ export function buildApp() {
       if (socket.readyState === 1) socket.send(JSON.stringify(event));
     });
   void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
-  void app.register(cookie);
+  void app.register(cookie, { secret: cookieSecret });
   void app.register(websocket);
   void app.register(helmet, { contentSecurityPolicy: false });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
@@ -176,13 +179,16 @@ export function buildApp() {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
+      signed: true,
     });
     return reply.redirect(process.env.WEB_ORIGIN ?? '/');
   });
   app.get('/api/auth/me', async (request) => await sessionUser(request));
   app.post('/api/auth/logout', async (request, reply) => {
-    const token = request.cookies.session;
-    if (token) await db.userSession.deleteMany({ where: { tokenHash: hashSessionId(token) } });
+    const signedToken = request.cookies.session;
+    const token = signedToken ? request.unsignCookie(signedToken) : null;
+    if (token?.valid && token.value)
+      await db.userSession.deleteMany({ where: { tokenHash: hashSessionId(token.value) } });
     reply.clearCookie('session', { path: '/' });
     return reply.code(204).send();
   });
