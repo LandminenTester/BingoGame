@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, confirmLobbyTask, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, type CurrentUser } from './api';
+import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, type CurrentUser } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -19,6 +19,7 @@ const cardFieldIds = ref<string[]>([]);
 const templateFieldIds = ref<string[]>([]);
 const activeLobbyId = ref<string | null>(null);
 const selectedTaskIndex = ref(0);
+let eventSocket: WebSocket | undefined;
 const currentUser = ref<CurrentUser | null>(null);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
@@ -28,6 +29,7 @@ const nav: { id: View; label: TranslationKey }[] = [
 ];
 
 onMounted(async () => { document.documentElement.dataset.theme = theme.value; currentUser.value = await getCurrentUser().catch(() => null); });
+onBeforeUnmount(() => eventSocket?.close());
 watch(locale, (value) => localStorage.setItem('bingo-locale', value));
 watch(theme, (value) => { localStorage.setItem('bingo-theme', value); document.documentElement.dataset.theme = value; });
 
@@ -48,10 +50,17 @@ async function submitJoin() {
   const cleanCode = joinCode.value.trim().toUpperCase();
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
   if (!currentUser.value) { beginTwitchLogin(); return; }
-  try { const joined = await joinLobbyRequest(cleanCode); activeLobbyId.value = joined.lobbyId; cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? []; templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? []; boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
+  try { const joined = await joinLobbyRequest(cleanCode); activeLobbyId.value = joined.lobbyId; cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? []; templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? []; boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); subscribeToLobby(joined.lobbyId); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
   catch (error) { joinError.value = (error as Error).message; }
 }
 async function signOut() { await logout(); currentUser.value = null; }
+function subscribeToLobby(lobbyId: string) {
+  eventSocket?.close(); eventSocket = connectLobbyEvents(lobbyId, (event) => {
+    const id = event.templateFieldId ?? event.fieldId; if (!id || typeof event.completed !== 'boolean') return;
+    const index = event.templateFieldId ? templateFieldIds.value.indexOf(id) : cardFieldIds.value.indexOf(id); if (index < 0) return;
+    const next = new Set(marked.value); event.completed ? next.add(index) : next.delete(index); marked.value = next;
+  });
+}
 async function confirmSelectedTask() {
   const fieldId = templateFieldIds.value[selectedTaskIndex.value];
   if (!activeLobbyId.value || !fieldId) return;

@@ -27,3 +27,11 @@ export async function confirmLobbyTask(lobbyId: string, templateFieldId: string,
   const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/tasks/${templateFieldId}`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ completed }) });
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not confirm task.' })); throw new Error(body.error); }
 }
+
+export function connectLobbyEvents(lobbyId: string, onEvent: (event: { type: string; fieldId?: string; templateFieldId?: string; completed?: boolean }) => void): WebSocket {
+  const url = new URL(`${apiBase || window.location.origin}/api/lobbies/${lobbyId}/events`);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(url);
+  socket.addEventListener('message', (message) => { try { onEvent(JSON.parse(message.data)); } catch { /* ignore invalid events */ } });
+  return socket;
+}
