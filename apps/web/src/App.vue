@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, logout, markCardField, setLobbyStatus, type CurrentUser } from './api';
+import { beginTwitchLogin, confirmLobbyTask, connectLobbyEvents, getCurrentUser, joinLobby as joinLobbyRequest, listTemplates, logout, markCardField, setLobbyStatus, type CurrentUser, type TemplateSummary } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -21,6 +21,7 @@ const activeLobbyId = ref<string | null>(null);
 const selectedTaskIndex = ref(0);
 let eventSocket: WebSocket | undefined;
 const currentUser = ref<CurrentUser | null>(null);
+const remoteTemplates = ref<TemplateSummary[]>([]);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
 const nav: { id: View; label: TranslationKey }[] = [
@@ -29,6 +30,7 @@ const nav: { id: View; label: TranslationKey }[] = [
 ];
 
 onMounted(async () => { document.documentElement.dataset.theme = theme.value; currentUser.value = await getCurrentUser().catch(() => null); });
+watch(view, async (value) => { if (value === 'templates') remoteTemplates.value = await listTemplates().catch(() => []); });
 onBeforeUnmount(() => eventSocket?.close());
 watch(locale, (value) => localStorage.setItem('bingo-locale', value));
 watch(theme, (value) => { localStorage.setItem('bingo-theme', value); document.documentElement.dataset.theme = value; });
@@ -116,7 +118,7 @@ async function toggleSessionPause() {
 
       <section v-else-if="view === 'join'" class="centered-view"><p class="eyebrow">{{ t('viewerAccess') }}</p><h1>{{ t('joinTitle') }}</h1><p>{{ t('joinCopy') }}</p><form class="join-form" @submit.prevent="submitJoin"><label>{{ t('code') }}<input v-model="joinCode" maxlength="6" placeholder="XAS7PK" autocomplete="off" @input="joinCode = joinCode.toUpperCase()" /></label><p v-if="joinError" class="error" role="alert">{{ joinError }}</p><button class="button wide">{{ t('joinAction') }}</button></form><small>{{ t('joinHint') }}</small></section>
 
-      <section v-else class="placeholder-view"><p class="eyebrow">{{ t('prototypeScreen') }}</p><h1>{{ t(view) }}</h1><p v-if="view === 'templates'">{{ t('templateCopy') }}</p><p v-else-if="view === 'history'">{{ t('historyCopy') }}</p><p v-else-if="view === 'stats'">{{ t('statsCopy') }}</p><p v-else>{{ t('settingsCopy') }}</p><div class="placeholder-grid"><div v-for="item in 3" :key="item" class="ghost-panel"><span></span><span></span><span></span></div></div></section>
+      <section v-else class="placeholder-view"><p class="eyebrow">{{ t('prototypeScreen') }}</p><h1>{{ t(view) }}</h1><template v-if="view === 'templates'"><p>{{ t('templateCopy') }}</p><div class="template-list"><article v-for="template in remoteTemplates" :key="template.id" class="template-item"><b>{{ template.name }}</b><small>{{ template.visibility }} · {{ template.fields.length }}/25</small></article><p v-if="!remoteTemplates.length" class="muted">No visible templates yet.</p></div></template><p v-else-if="view === 'history'">{{ t('historyCopy') }}</p><p v-else-if="view === 'stats'">{{ t('statsCopy') }}</p><p v-else>{{ t('settingsCopy') }}</p><div v-if="view !== 'templates'" class="placeholder-grid"><div v-for="item in 3" :key="item" class="ghost-panel"><span></span><span></span><span></span></div></div></section>
     </section>
   </main>
 </template>

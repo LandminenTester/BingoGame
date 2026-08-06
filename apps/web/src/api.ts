@@ -1,10 +1,16 @@
 const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
 export interface CurrentUser { id: string; displayName: string; login: string; profileImageUrl?: string; }
+export interface TemplateSummary { id: string; name: string; visibility: string; fields: Array<{ id: string; label: string }>; }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const response = await fetch(`${apiBase}/api/auth/me`, { credentials: 'include' });
   if (!response.ok) throw new Error('Could not restore session.');
+  return response.json();
+}
+export async function listTemplates(): Promise<TemplateSummary[]> {
+  const response = await fetch(`${apiBase}/api/templates`, { credentials: 'include' });
+  if (!response.ok) throw new Error('Could not load templates.');
   return response.json();
 }
 
