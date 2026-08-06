@@ -47,6 +47,7 @@ export class LobbyStore {
     if (!user) throw new Error('Participant not found.');
     const participant = await db.lobbyParticipant.findUnique({ where: { lobbyId_userId: { lobbyId, userId: user.id } }, include: { card: { include: { fields: true } }, lobby: true } });
     if (!participant?.card) throw new Error('Player card not found.');
+    if (participant.lobby.status !== 'running') throw new Error('The lobby is not running.');
     if (participant.lobby.gameMode !== 'individual') throw new Error('This lobby is streamer-controlled.');
     const field = participant.card.fields.find((cardField) => cardField.id === fieldId);
     if (!field) throw new Error('Field not found on player card.');
@@ -56,6 +57,7 @@ export class LobbyStore {
   async confirmLobbyTask(lobbyId: string, hostTwitchUserId: string, templateFieldId: string, completed: boolean) {
     const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
     if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId) throw new Error('Only the host can confirm tasks.');
+    if (lobby.status !== 'running') throw new Error('The lobby is not running.');
     if (lobby.gameMode !== 'streamer_controlled') throw new Error('This lobby is not streamer-controlled.');
     await db.$transaction([
       db.lobbyEvent.create({ data: { lobbyId, templateFieldId, completed } }),
