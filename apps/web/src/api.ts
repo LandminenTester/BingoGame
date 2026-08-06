@@ -28,7 +28,7 @@ export async function confirmLobbyTask(lobbyId: string, templateFieldId: string,
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not confirm task.' })); throw new Error(body.error); }
 }
 
-export function connectLobbyEvents(lobbyId: string, onEvent: (event: { type: string; fieldId?: string; templateFieldId?: string; completed?: boolean }) => void): WebSocket {
+export function connectLobbyEvents(lobbyId: string, onEvent: (event: any) => void): WebSocket {
   const url = new URL(`${apiBase || window.location.origin}/api/lobbies/${lobbyId}/events`);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(url);

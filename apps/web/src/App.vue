@@ -56,6 +56,12 @@ async function submitJoin() {
 async function signOut() { await logout(); currentUser.value = null; }
 function subscribeToLobby(lobbyId: string) {
   eventSocket?.close(); eventSocket = connectLobbyEvents(lobbyId, (event) => {
+    if (event.type === 'lobby.snapshot') {
+      const participant = event.lobby?.participants?.find((entry: any) => entry.user?.twitchUserId === currentUser.value?.id);
+      const fields = participant?.card?.fields; if (!fields) return;
+      cardFieldIds.value = fields.map((field: any) => field.id); templateFieldIds.value = fields.map((field: any) => field.templateField.id);
+      boardTasks.value = fields.map((field: any) => field.templateField.label); marked.value = new Set(fields.flatMap((field: any, index: number) => field.completedAt ? [index] : [])); return;
+    }
     const id = event.templateFieldId ?? event.fieldId; if (!id || typeof event.completed !== 'boolean') return;
     const index = event.templateFieldId ? templateFieldIds.value.indexOf(id) : cardFieldIds.value.indexOf(id); if (index < 0) return;
     const next = new Set(marked.value); event.completed ? next.add(index) : next.delete(index); marked.value = next;
