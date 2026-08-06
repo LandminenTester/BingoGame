@@ -241,9 +241,16 @@ async function submitLobby() {
       password: lobbyPassword.value || undefined,
     });
     await setLobbyStatus(lobby.id, 'open');
+    const joined = await joinLobbyRequest(lobby.code, lobbyPassword.value || undefined);
     activeLobbyId.value = lobby.id;
     activeLobbyStatus.value = 'open';
     code.value = lobby.code;
+    cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? [];
+    templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? [];
+    boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? [];
+    marked.value = new Set(
+      joined.card?.fields.flatMap((field, index) => (field.completedAt ? [index] : [])) ?? [],
+    );
     sessionPaused.value = false;
     templateError.value = '';
     view.value = 'dashboard';
@@ -371,7 +378,16 @@ async function toggleSessionPause() {
         </div>
       </header>
 
-      <section v-if="view === 'dashboard'" class="dashboard">
+      <section v-if="view === 'dashboard' && !activeLobbyId" class="centered-view">
+        <p class="eyebrow">BEREIT ZUM SENDEN</p>
+        <h1>Erstelle deine<br /><em>erste Lobby</em></h1>
+        <p>
+          Lege zuerst eine Vorlage mit 25 Aufgaben an und starte danach deine Twitch-Bingo-Session.
+        </p>
+        <button class="button wide" @click="view = 'templates'">Zu Vorlagen und Lobbys</button>
+      </section>
+
+      <section v-else-if="view === 'dashboard'" class="dashboard">
         <div class="session-heading">
           <div>
             <p class="eyebrow">{{ t('runningMode') }}</p>
