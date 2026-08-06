@@ -29,4 +29,13 @@ describe('health endpoints', () => {
     const response = await app.inject({ method: 'GET', url: '/api/statistics/someone' });
     expect(response.statusCode).toBe(401);
   });
+
+  it('rejects OAuth callbacks without a matching state and PKCE verifier', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/auth/twitch/callback?code=example&state=forged',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: 'Invalid OAuth state.' });
+  });
 });
