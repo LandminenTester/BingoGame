@@ -4,6 +4,8 @@ import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId } from './auth.js';
+import { generateApiKey, hashApiKey } from './api-keys.js';
+import { db } from './db.js';
 import { LobbyStore } from './lobby-store.js';
 
 export function buildApp() {
@@ -73,6 +75,33 @@ export function buildApp() {
   app.get('/api/lobbies/:lobbyId/leaderboard', async (request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
     return store.leaderboard(lobbyId);
+  });
+  app.get('/api/history/hosted/:userId', async (request) => {
+    const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    return db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true }, orderBy: { createdAt: 'desc' } });
+  });
+  app.get('/api/statistics/:userId', async (request) => {
+    const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true } });
+    return { totalSessions: lobbies.length, totalParticipants: lobbies.reduce((total, lobby) => total + lobby._count.participants, 0), completedCards: lobbies.reduce((total, lobby) => total + lobby.results.length, 0) };
+  });
+  app.post('/api/api-keys', async (request, reply) => {
+    const { userId, name, scopes, expiresAt } = z.object({ userId: z.string(), name: z.string().min(1).max(100), scopes: z.array(z.enum(['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'])).min(1), expiresAt: z.string().datetime().optional() }).parse(request.body);
+    const user = await db.user.findUnique({ where: { twitchUserId: userId } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
+    const key = generateApiKey(); const record = await db.apiKey.create({ data: { userId: user.id, name, scopes, keyHash: hashApiKey(key), expiresAt: expiresAt ? new Date(expiresAt) : undefined } });
+    return reply.code(201).send({ id: record.id, key, scopes: record.scopes, expiresAt: record.expiresAt });
+  });
+  app.get('/api/api-keys/:userId', async (request) => {
+    const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    return db.apiKey.findMany({ where: { user: { twitchUserId: userId } }, select: { id: true, name: true, scopes: true, createdAt: true, expiresAt: true, lastUsedAt: true, revokedAt: true } });
+  });
+  app.get('/api/v1/channels/:channelId/session', async (request, reply) => {
+    const { channelId } = z.object({ channelId: z.string() }).parse(request.params);
+    const rawKey = request.headers['x-api-key']; if (typeof rawKey !== 'string') return reply.code(401).send({ error: 'Missing API key.' });
+    const key = await db.apiKey.findUnique({ where: { keyHash: hashApiKey(rawKey) }, include: { user: true } });
+    if (!key || key.user.twitchUserId !== channelId || key.revokedAt || (key.expiresAt && key.expiresAt < new Date()) || !key.scopes.includes('session:read')) return reply.code(403).send({ error: 'Invalid API key.' });
+    await db.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } });
+    return db.lobby.findFirst({ where: { hostId: key.userId, status: { in: ['open', 'running', 'paused'] } }, orderBy: { createdAt: 'desc' }, include: { template: true, _count: { select: { participants: true } } } });
   });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
