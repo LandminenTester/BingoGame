@@ -56,6 +56,20 @@ export function buildApp() {
     const { userId } = z.object({ userId: z.string().min(1) }).parse(request.body);
     try { return await store.joinLobby(code, userId); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
+  app.post('/api/lobbies/:lobbyId/cards/:fieldId', async (request, reply) => {
+    const { lobbyId, fieldId } = z.object({ lobbyId: z.string(), fieldId: z.string() }).parse(request.params);
+    const { userId, completed } = z.object({ userId: z.string(), completed: z.boolean() }).parse(request.body);
+    try { return await store.markPlayerField(lobbyId, userId, fieldId, completed); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+  });
+  app.post('/api/lobbies/:lobbyId/tasks/:templateFieldId', async (request, reply) => {
+    const { lobbyId, templateFieldId } = z.object({ lobbyId: z.string(), templateFieldId: z.string() }).parse(request.params);
+    const { hostId, completed } = z.object({ hostId: z.string(), completed: z.boolean() }).parse(request.body);
+    try { return await store.confirmLobbyTask(lobbyId, hostId, templateFieldId, completed); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+  });
+  app.get('/api/lobbies/:lobbyId/leaderboard', async (request) => {
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
+    return store.leaderboard(lobbyId);
+  });
 
   return app;
 }

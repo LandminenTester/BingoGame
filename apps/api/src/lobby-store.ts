@@ -1,4 +1,4 @@
-import { generateLobbyCode, shuffleCard, type GameMode, type WinningCondition } from '@twitch-bingo/contracts';
+import { generateLobbyCode, isWinningCard, shuffleCard, type GameMode, type WinningCondition } from '@twitch-bingo/contracts';
 import { db } from './db.js';
 
 export interface TemplateInput { name: string; fields: string[]; visibility?: 'private' | 'public' | 'unlisted'; authorId?: string; }
@@ -41,5 +41,41 @@ export class LobbyStore {
       },
       include: { card: { include: { fields: { orderBy: { position: 'asc' } } } } },
     });
+  }
+  async markPlayerField(lobbyId: string, twitchUserId: string, fieldId: string, completed: boolean) {
+    const user = await db.user.findUnique({ where: { twitchUserId } });
+    if (!user) throw new Error('Participant not found.');
+    const participant = await db.lobbyParticipant.findUnique({ where: { lobbyId_userId: { lobbyId, userId: user.id } }, include: { card: { include: { fields: true } }, lobby: true } });
+    if (!participant?.card) throw new Error('Player card not found.');
+    if (participant.lobby.gameMode !== 'individual') throw new Error('This lobby is streamer-controlled.');
+    const field = participant.card.fields.find((cardField) => cardField.id === fieldId);
+    if (!field) throw new Error('Field not found on player card.');
+    await db.playerCardField.update({ where: { id: field.id }, data: { completedAt: completed ? new Date() : null } });
+    return this.recordResult(participant.id);
+  }
+  async confirmLobbyTask(lobbyId: string, hostTwitchUserId: string, templateFieldId: string, completed: boolean) {
+    const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
+    if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId) throw new Error('Only the host can confirm tasks.');
+    if (lobby.gameMode !== 'streamer_controlled') throw new Error('This lobby is not streamer-controlled.');
+    await db.$transaction([
+      db.lobbyEvent.create({ data: { lobbyId, templateFieldId, completed } }),
+      db.playerCardField.updateMany({ where: { templateFieldId, card: { participant: { lobbyId } } }, data: { completedAt: completed ? new Date() : null, confirmedByHost: completed } }),
+    ]);
+    const participants = await db.lobbyParticipant.findMany({ where: { lobbyId }, select: { id: true } });
+    return Promise.all(participants.map((participant) => this.recordResult(participant.id)));
+  }
+  async leaderboard(lobbyId: string) {
+    return db.bingoResult.findMany({ where: { lobbyId }, include: { participant: { include: { user: true } } }, orderBy: { placement: 'asc' } });
+  }
+  private async recordResult(participantId: string) {
+    const participant = await db.lobbyParticipant.findUnique({ where: { id: participantId }, include: { card: { include: { fields: true } }, lobby: true } });
+    if (!participant?.card) return null;
+    const completed = new Set(participant.card.fields.filter((field) => field.completedAt).map((field) => field.position));
+    if (!isWinningCard(completed, participant.lobby.winningCondition)) return { won: false, completedFields: completed.size };
+    const existing = await db.bingoResult.findUnique({ where: { participantId } });
+    if (existing) return { won: true, result: existing };
+    const placement = await db.bingoResult.count({ where: { lobbyId: participant.lobbyId } }) + 1;
+    const result = await db.bingoResult.create({ data: { lobbyId: participant.lobbyId, participantId, placement, completedAt: new Date(), completedFields: completed.size, isWinner: placement === 1 } });
+    return { won: true, result };
   }
 }
