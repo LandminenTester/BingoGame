@@ -14,7 +14,9 @@ export class LobbyStore {
     const author = input.authorId ? await ensureUser(input.authorId) : undefined;
     return db.bingoTemplate.create({ data: { name: input.name, visibility: input.visibility ?? 'private', authorId: author?.id, fields: { create: input.fields.map((label, position) => ({ label, position })) }, tags: [] }, include: { fields: { orderBy: { position: 'asc' } } } });
   }
-  listTemplates() { return db.bingoTemplate.findMany({ include: { fields: { orderBy: { position: 'asc' } } }, orderBy: { createdAt: 'desc' } }); }
+  listTemplates(twitchUserId?: string) {
+    return db.bingoTemplate.findMany({ where: twitchUserId ? { OR: [{ visibility: 'public' }, { author: { twitchUserId } }] } : { visibility: 'public' }, include: { fields: { orderBy: { position: 'asc' } } }, orderBy: { createdAt: 'desc' } });
+  }
   async createLobby(input: LobbyInput) {
     const template = await db.bingoTemplate.findUnique({ where: { id: input.templateId } });
     if (!template) throw new Error('Template not found.');

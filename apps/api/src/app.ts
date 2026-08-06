@@ -56,7 +56,7 @@ export function buildApp() {
   });
   app.get('/api/auth/me', async (request) => sessions.get(request.cookies.session ?? '') ?? null);
   app.post('/api/auth/logout', async (request, reply) => { sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send(); });
-  app.get('/api/templates', async () => await store.listTemplates());
+  app.get('/api/templates', async (request) => await store.listTemplates(sessionUser(request)?.id));
   app.post('/api/templates', async (request, reply) => {
     const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
