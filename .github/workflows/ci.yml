@@ -3,6 +3,21 @@ on: [push, pull_request]
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bingo
+          POSTGRES_PASSWORD: bingo
+          POSTGRES_DB: twitch_bingo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bingo -d twitch_bingo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bingo:bingo@localhost:5432/twitch_bingo?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -10,6 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @twitch-bingo/api exec prisma migrate deploy
       - run: pnpm build
       - run: pnpm lint
       - run: pnpm test
