@@ -15,9 +15,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@twitch-bingo/contracts": "workspace:*",
+    "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.1.0",
     "@prisma/client": "^6.19.3",
+    "@twitch-bingo/contracts": "workspace:*",
+    "dotenv": "^17.4.2",
     "fastify": "^5.5.0",
     "zod": "^4.1.3"
   },
