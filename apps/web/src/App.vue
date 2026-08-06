@@ -8,6 +8,7 @@ import {
   connectLobbyEvents,
   createLobby,
   createTemplate,
+  deleteTemplate,
   createApiKey,
   getCurrentUser,
   getLeaderboard,
@@ -21,6 +22,7 @@ import {
   resetStatistics,
   revokeApiKey,
   setLobbyStatus,
+  updateTemplate,
   type CurrentUser,
   type ApiKeySummary,
   type ChannelStatistics,
@@ -56,6 +58,7 @@ const templateName = ref('');
 const templateVisibility = ref<'private' | 'public' | 'unlisted'>('private');
 const templateFields = ref(Array.from({ length: 25 }, (_, index) => `Aufgabe ${index + 1}`));
 const templateError = ref('');
+const editingTemplateId = ref<string | null>(null);
 const lobbyName = ref('');
 const lobbyTemplateId = ref('');
 const lobbyMode = ref<'individual' | 'streamer_controlled'>('streamer_controlled');
@@ -187,13 +190,36 @@ async function refreshTemplates() {
 async function submitTemplate() {
   if (!currentUser.value) return beginTwitchLogin();
   try {
-    await createTemplate({
+    const input = {
       name: templateName.value,
       visibility: templateVisibility.value,
       fields: templateFields.value,
-    });
+    };
+    if (editingTemplateId.value) await updateTemplate(editingTemplateId.value, input);
+    else await createTemplate(input);
     templateName.value = '';
+    editingTemplateId.value = null;
     templateError.value = '';
+    await refreshTemplates();
+  } catch (error) {
+    templateError.value = (error as Error).message;
+  }
+}
+function editTemplate(template: TemplateSummary) {
+  editingTemplateId.value = template.id;
+  templateName.value = template.name;
+  templateVisibility.value = template.visibility as 'private' | 'public' | 'unlisted';
+  templateFields.value = template.fields.map((field) => field.label);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function removeTemplate(template: TemplateSummary) {
+  if (!window.confirm(`Vorlage „${template.name}“ wirklich löschen?`)) return;
+  try {
+    await deleteTemplate(template.id);
+    if (editingTemplateId.value === template.id) {
+      editingTemplateId.value = null;
+      templateName.value = '';
+    }
     await refreshTemplates();
   } catch (error) {
     templateError.value = (error as Error).message;
@@ -497,6 +523,13 @@ async function toggleSessionPause() {
             <article v-for="template in remoteTemplates" :key="template.id" class="template-item">
               <b>{{ template.name }}</b
               ><small>{{ template.visibility }} · {{ template.fields.length }}/25</small>
+              <span class="template-actions"
+                ><button class="link" type="button" @click="editTemplate(template)">
+                  Bearbeiten</button
+                ><button class="link" type="button" @click="removeTemplate(template)">
+                  Löschen
+                </button></span
+              >
             </article>
             <p v-if="!remoteTemplates.length" class="muted">No visible templates yet.</p>
           </div>

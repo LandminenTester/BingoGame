@@ -55,6 +55,19 @@ export async function createTemplate(input: {
     'Could not create template.',
   );
 }
+export async function updateTemplate(
+  id: string,
+  input: { name: string; fields: string[]; visibility: 'private' | 'public' | 'unlisted' },
+): Promise<TemplateSummary> {
+  return requestJson(
+    `/api/templates/${id}`,
+    { method: 'PUT', body: JSON.stringify(input) },
+    'Could not update template.',
+  );
+}
+export async function deleteTemplate(id: string): Promise<void> {
+  return requestJson(`/api/templates/${id}`, { method: 'DELETE' }, 'Could not delete template.');
+}
 export async function createLobby(input: {
   name: string;
   templateId: string;
