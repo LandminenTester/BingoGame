@@ -60,6 +60,12 @@ export function buildApp() {
   });
   app.get('/api/auth/me', async (request) => sessions.get(request.cookies.session ?? '') ?? null);
   app.post('/api/auth/logout', async (request, reply) => { sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send(); });
+  app.delete('/api/account', async (request, reply) => {
+    const session = sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await db.user.findUnique({ where: { twitchUserId: session.id }, include: { _count: { select: { hostedLobbies: true } } } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
+    if (user._count.hostedLobbies) return reply.code(409).send({ error: 'End or delete hosted lobbies before deleting the account.' });
+    await db.user.delete({ where: { id: user.id } }); sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send();
+  });
   app.get('/api/templates', async (request) => await store.listTemplates(sessionUser(request)?.id));
   app.post('/api/templates', async (request, reply) => {
     const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
