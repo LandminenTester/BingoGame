@@ -128,13 +128,13 @@ export const useLobbyStore = defineStore('lobby', {
       completed ? next.add(index) : next.delete(index);
       this.marked = next;
     },
-    async confirmTask(index: number) {
+    async confirmTask(index: number, completed = true) {
       const fieldId = this.templateFieldIds[index];
       if (!this.activeLobbyId || !fieldId) return;
       try {
-        await confirmLobbyTask(this.activeLobbyId, fieldId, true);
+        await confirmLobbyTask(this.activeLobbyId, fieldId, completed);
         const next = new Set(this.marked);
-        next.add(index);
+        completed ? next.add(index) : next.delete(index);
         this.marked = next;
       } catch (error) {
         this.error = (error as Error).message;

@@ -9,6 +9,21 @@ import { createSessionId, hashSessionId } from './auth.js';
 import { db } from './db.js';
 import { verifyLobbyPassword } from './password.js';
 
+/** Carries an intended HTTP status code so route handlers don't have to guess from the message. */
+export class HttpError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+/** Twitch login permanently allowed to approve public templates and manage the approved-publisher list. */
+export const SUPER_PUBLISHER_LOGIN = 'landminentester';
+
+const TEMPLATE_FIELD_MIN = 25;
+const TEMPLATE_FIELD_MAX = 50;
+
 export interface TemplateInput {
   name: string;
   fields: string[];
@@ -64,10 +79,37 @@ export class LobbyStore {
       },
     });
   }
+  /** landminentester is a permanent super-publisher; anyone else needs an ApprovedPublisher row. */
+  async canPublishPublicly(loginName: string) {
+    if (loginName === SUPER_PUBLISHER_LOGIN) return true;
+    const entry = await db.approvedPublisher.findUnique({ where: { loginName } });
+    return Boolean(entry);
+  }
+  private async assertCanSetVisibility(visibility: string | undefined, author: { loginName: string }) {
+    if (visibility !== 'public') return;
+    if (!(await this.canPublishPublicly(author.loginName)))
+      throw new HttpError(
+        403,
+        'Public templates are not unlocked for this channel yet. Ask landminentester for access.',
+      );
+  }
+  private validateFields(fields: string[]) {
+    if (
+      fields.length < TEMPLATE_FIELD_MIN ||
+      fields.length > TEMPLATE_FIELD_MAX ||
+      fields.some((field) => !field.trim())
+    )
+      throw new HttpError(
+        400,
+        `Templates require between ${TEMPLATE_FIELD_MIN} and ${TEMPLATE_FIELD_MAX} non-empty fields.`,
+      );
+  }
   async createTemplate(input: TemplateInput) {
-    if (input.fields.length !== 25 || input.fields.some((field) => !field.trim()))
-      throw new Error('Templates require exactly 25 non-empty fields.');
+    this.validateFields(input.fields);
     const author = input.authorId ? await ensureUser(input.authorId) : undefined;
+    if (author) await this.assertCanSetVisibility(input.visibility, author);
+    else if (input.visibility === 'public')
+      throw new HttpError(403, 'Public templates require an authenticated, approved channel.');
     return db.bingoTemplate.create({
       data: {
         name: input.name,
@@ -81,10 +123,34 @@ export class LobbyStore {
   }
   listTemplates(twitchUserId?: string) {
     return db.bingoTemplate.findMany({
-      where: twitchUserId
-        ? { OR: [{ visibility: { in: ['public', 'predefined'] } }, { author: { twitchUserId } }] }
-        : { visibility: { in: ['public', 'predefined'] } },
+      where: {
+        deletedAt: null,
+        ...(twitchUserId
+          ? { OR: [{ visibility: { in: ['public', 'predefined'] } }, { author: { twitchUserId } }] }
+          : { visibility: { in: ['public', 'predefined'] } }),
+      },
       include: { fields: { orderBy: { position: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+  /** All non-deleted public templates across every author, for the public browser. */
+  listPublicTemplates(search?: string) {
+    return db.bingoTemplate.findMany({
+      where: {
+        deletedAt: null,
+        visibility: 'public',
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { game: { contains: search, mode: 'insensitive' } },
+                { category: { contains: search, mode: 'insensitive' } },
+                { tags: { has: search } },
+              ],
+            }
+          : {}),
+      },
+      include: { fields: { orderBy: { position: 'asc' } }, author: true },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -93,23 +159,23 @@ export class LobbyStore {
       where: { id },
       include: { author: true, fields: { orderBy: { position: 'asc' } } },
     });
-    if (!template) throw new Error('Template not found.');
+    if (!template || template.deletedAt) throw new HttpError(404, 'Template not found.');
     const owned = template.author?.twitchUserId === twitchUserId;
     if (!owned && !['public', 'unlisted', 'predefined'].includes(template.visibility))
-      throw new Error('Template not found.');
+      throw new HttpError(404, 'Template not found.');
     return template;
   }
   async updateTemplate(id: string, twitchUserId: string, input: TemplateInput) {
-    if (input.fields.length !== 25 || input.fields.some((field) => !field.trim()))
-      throw new Error('Templates require exactly 25 non-empty fields.');
+    this.validateFields(input.fields);
     const template = await db.bingoTemplate.findUnique({
       where: { id },
       include: { author: true, _count: { select: { lobbies: true } } },
     });
-    if (!template || template.author?.twitchUserId !== twitchUserId)
-      throw new Error('Template not found or forbidden.');
+    if (!template || template.deletedAt || template.author?.twitchUserId !== twitchUserId)
+      throw new HttpError(404, 'Template not found or forbidden.');
     if (template._count.lobbies)
-      throw new Error('Templates used by a lobby cannot be edited. Duplicate it instead.');
+      throw new HttpError(409, 'Templates used by a lobby cannot be edited. Duplicate it instead.');
+    if (template.author) await this.assertCanSetVisibility(input.visibility, template.author);
     return db.$transaction(async (tx) => {
       await tx.bingoTemplateField.deleteMany({ where: { templateId: id } });
       return tx.bingoTemplate.update({
@@ -123,15 +189,56 @@ export class LobbyStore {
       });
     });
   }
+  /** Templates are never hard-deleted: they stay in the DB (referenced by past/live lobbies) but
+   *  disappear from the author's own lists and the public browser. */
   async deleteTemplate(id: string, twitchUserId: string) {
     const template = await db.bingoTemplate.findUnique({
       where: { id },
-      include: { author: true, _count: { select: { lobbies: true } } },
+      include: { author: true },
     });
-    if (!template || template.author?.twitchUserId !== twitchUserId)
-      throw new Error('Template not found or forbidden.');
-    if (template._count.lobbies) throw new Error('Templates used by a lobby cannot be deleted.');
-    await db.bingoTemplate.delete({ where: { id } });
+    if (!template || template.deletedAt || template.author?.twitchUserId !== twitchUserId)
+      throw new HttpError(404, 'Template not found or forbidden.');
+    await db.bingoTemplate.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+  async listFavoriteTemplates(twitchUserId: string) {
+    const user = await db.user.findUnique({ where: { twitchUserId } });
+    if (!user) return [];
+    const favorites = await db.templateFavorite.findMany({
+      where: { userId: user.id, template: { deletedAt: null } },
+      include: { template: { include: { fields: { orderBy: { position: 'asc' } }, author: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return favorites.map((favorite) => favorite.template);
+  }
+  async addFavoriteTemplate(twitchUserId: string, templateId: string) {
+    const user = await ensureUser(twitchUserId);
+    const template = await db.bingoTemplate.findUnique({ where: { id: templateId } });
+    if (!template || template.deletedAt) throw new HttpError(404, 'Template not found.');
+    await db.templateFavorite.upsert({
+      where: { userId_templateId: { userId: user.id, templateId } },
+      update: {},
+      create: { userId: user.id, templateId },
+    });
+  }
+  async removeFavoriteTemplate(twitchUserId: string, templateId: string) {
+    const user = await db.user.findUnique({ where: { twitchUserId } });
+    if (!user) return;
+    await db.templateFavorite.deleteMany({ where: { userId: user.id, templateId } });
+  }
+  async listApprovedPublishers() {
+    return db.approvedPublisher.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+  async addApprovedPublisher(loginName: string, addedByUserId: string) {
+    const normalized = loginName.trim().toLowerCase();
+    if (!normalized) throw new HttpError(400, 'Twitch login is required.');
+    return db.approvedPublisher.upsert({
+      where: { loginName: normalized },
+      update: {},
+      create: { loginName: normalized, addedByUserId },
+    });
+  }
+  async removeApprovedPublisher(id: string) {
+    await db.approvedPublisher.deleteMany({ where: { id } });
   }
   async createLobby(input: LobbyInput) {
     const template = await db.bingoTemplate.findUnique({ where: { id: input.templateId } });
@@ -464,6 +571,18 @@ export class LobbyStore {
         endedAt: ['completed', 'cancelled'].includes(status) ? now : null,
       },
     });
+  }
+  /** Auto-ends sessions the host forgot about: anything still open/running/paused for 48h+. */
+  async cleanupStaleLobbies(staleAfterMs = 1000 * 60 * 60 * 48) {
+    const cutoff = new Date(Date.now() - staleAfterMs);
+    const result = await db.lobby.updateMany({
+      where: {
+        status: { in: ['draft', 'open', 'running', 'paused'] },
+        createdAt: { lt: cutoff },
+      },
+      data: { status: 'completed', endedAt: new Date() },
+    });
+    return result.count;
   }
   private async recordResult(participantId: string) {
     const participant = await db.lobbyParticipant.findUnique({

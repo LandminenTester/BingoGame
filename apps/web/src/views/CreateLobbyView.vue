@@ -86,6 +86,9 @@ async function submit() {
           { value: 'individual', label: t('individual') },
         ]"
       />
+      <p class="hint">
+        {{ mode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}
+      </p>
       <BaseSelect
         v-model="win"
         :label="t('winningCondition')"

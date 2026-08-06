@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink, RouterView, useRouter } from 'vue-router';
 import { locales, translate, type TranslationKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
@@ -17,7 +18,21 @@ const nav: { name: string; label: TranslationKey }[] = [
   { name: 'settings', label: 'settings' },
 ];
 
+const accountMenuOpen = ref(false);
+const accountRoot = ref<HTMLElement | null>(null);
+
+function toggleAccountMenu() {
+  accountMenuOpen.value = !accountMenuOpen.value;
+}
+function onDocumentClick(event: MouseEvent) {
+  if (accountRoot.value && !accountRoot.value.contains(event.target as Node))
+    accountMenuOpen.value = false;
+}
+onMounted(() => document.addEventListener('click', onDocumentClick));
+onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick));
+
 async function signOut() {
+  accountMenuOpen.value = false;
   await session.logout();
   await router.push({ name: 'landing' });
 }
@@ -27,6 +42,33 @@ async function signOut() {
   <main class="app-shell">
     <aside class="sidebar" aria-label="Main navigation">
       <div class="brand"><span class="brand-mark">S</span><span>SIGNAL<br /><b>BINGO</b></span></div>
+      <div ref="accountRoot" class="account-panel">
+        <button
+          v-if="session.twitchUser"
+          type="button"
+          class="account-trigger"
+          :aria-expanded="accountMenuOpen"
+          @click="toggleAccountMenu"
+        >
+          <span class="avatar">{{ session.twitchUser.displayName.slice(0, 2).toUpperCase() }}</span>
+          <span
+            ><b>{{ session.twitchUser.displayName }}</b
+            ><small>{{ t('streamerAccount') }}</small></span
+          >
+        </button>
+        <div v-else class="account-signin">
+          <b>{{ t('pleaseSignIn') }}</b>
+          <span>{{ t('pleaseSignInHint') }}</span>
+          <button class="button" type="button" @click="session.loginWithTwitch()">
+            {{ t('twitchLogin') }}
+          </button>
+        </div>
+        <div v-if="accountMenuOpen" class="account-menu" role="menu">
+          <button type="button" role="menuitem" @click="signOut">
+            {{ t('accountMenuLogout') }}
+          </button>
+        </div>
+      </div>
       <nav>
         <RouterLink
           v-for="item in nav"
@@ -40,15 +82,9 @@ async function signOut() {
           </button>
         </RouterLink>
       </nav>
-      <div class="user-panel">
-        <span class="avatar">{{
-          session.twitchUser?.displayName.slice(0, 2).toUpperCase() ?? 'PP'
-        }}</span>
-        <span
-          ><b>{{ session.twitchUser?.displayName ?? 'PixelPanda' }}</b
-          ><small>{{ t('streamerAccount') }}</small></span
-        >
-        <button class="more" :aria-label="t('accountOptions')" @click="signOut">↪</button>
+      <div class="legal-links">
+        <RouterLink :to="{ name: 'imprint' }">{{ t('imprint') }}</RouterLink>
+        <RouterLink :to="{ name: 'privacy' }">{{ t('privacyPolicy') }}</RouterLink>
       </div>
     </aside>
 

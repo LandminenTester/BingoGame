@@ -16,8 +16,12 @@ import {
 } from './auth.js';
 import { generateApiKey, hashApiKey } from './api-keys.js';
 import { db } from './db.js';
-import { LobbyStore, type LobbyIdentity } from './lobby-store.js';
+import { HttpError, LobbyStore, SUPER_PUBLISHER_LOGIN, type LobbyIdentity } from './lobby-store.js';
 import { hashLobbyPassword } from './password.js';
+
+/** Maps a thrown error to a status code: HttpError carries its own, everything else falls back. */
+const errorStatus = (error: unknown, fallback: number) =>
+  error instanceof HttpError ? error.statusCode : fallback;
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -89,6 +93,7 @@ export async function buildApp() {
   await app.register(cors, {
     origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'],
   });
   await app.register(cookie, { secret: cookieSecret });
   await app.register(websocket);
@@ -107,6 +112,16 @@ export async function buildApp() {
   await app.register(swaggerUi, { routePrefix: '/documentation' });
   app.addHook('onReady', async () => {
     await store.ensurePredefinedTemplates();
+  });
+  const cleanupInterval = setInterval(
+    () => {
+      store.cleanupStaleLobbies().catch((error) => app.log.error(error, 'Stale lobby cleanup failed'));
+    },
+    1000 * 60 * 15,
+  );
+  cleanupInterval.unref();
+  app.addHook('onClose', async () => {
+    clearInterval(cleanupInterval);
   });
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
@@ -251,12 +266,39 @@ export async function buildApp() {
     '/api/templates',
     async (request) => await store.listTemplates((await sessionUser(request))?.id),
   );
+  app.get('/api/templates/public', async (request) => {
+    const { search } = z.object({ search: z.string().max(100).optional() }).parse(request.query);
+    return store.listPublicTemplates(search);
+  });
+  app.get('/api/templates/favorites', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    return store.listFavoriteTemplates(user.id);
+  });
+  app.post('/api/templates/:id/favorite', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    try {
+      await store.addFavoriteTemplate(user.id, id);
+      return reply.code(204).send();
+    } catch (error) {
+      return reply.code(errorStatus(error, 400)).send({ error: (error as Error).message });
+    }
+  });
+  app.delete('/api/templates/:id/favorite', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    await store.removeFavoriteTemplate(user.id, id);
+    return reply.code(204).send();
+  });
   app.get('/api/templates/:id', async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
     try {
       return await store.getTemplate(id, (await sessionUser(request))?.id);
     } catch (error) {
-      return reply.code(404).send({ error: (error as Error).message });
+      return reply.code(errorStatus(error, 404)).send({ error: (error as Error).message });
     }
   });
   app.post('/api/templates', async (request, reply) => {
@@ -265,14 +307,14 @@ export async function buildApp() {
     const input = z
       .object({
         name: z.string().min(1).max(100),
-        fields: z.array(z.string().max(160)).length(25),
+        fields: z.array(z.string().max(160)).min(25).max(50),
         visibility: z.enum(['private', 'public', 'unlisted']).optional(),
       })
       .parse(request.body);
     try {
       return reply.code(201).send(await store.createTemplate({ ...input, authorId: user.id }));
     } catch (error) {
-      return reply.code(400).send({ error: (error as Error).message });
+      return reply.code(errorStatus(error, 400)).send({ error: (error as Error).message });
     }
   });
   app.put('/api/templates/:id', async (request, reply) => {
@@ -282,14 +324,14 @@ export async function buildApp() {
     const input = z
       .object({
         name: z.string().min(1).max(100),
-        fields: z.array(z.string().max(160)).length(25),
+        fields: z.array(z.string().max(160)).min(25).max(50),
         visibility: z.enum(['private', 'public', 'unlisted']).optional(),
       })
       .parse(request.body);
     try {
       return await store.updateTemplate(id, user.id, input);
     } catch (error) {
-      return reply.code(403).send({ error: (error as Error).message });
+      return reply.code(errorStatus(error, 403)).send({ error: (error as Error).message });
     }
   });
   app.delete('/api/templates/:id', async (request, reply) => {
@@ -300,8 +342,33 @@ export async function buildApp() {
       await store.deleteTemplate(id, user.id);
       return reply.code(204).send();
     } catch (error) {
-      return reply.code(403).send({ error: (error as Error).message });
+      return reply.code(errorStatus(error, 403)).send({ error: (error as Error).message });
     }
+  });
+  app.get('/api/approved-publishers', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user || user.login !== SUPER_PUBLISHER_LOGIN)
+      return reply.code(403).send({ error: 'Forbidden.' });
+    return store.listApprovedPublishers();
+  });
+  app.post('/api/approved-publishers', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user || user.login !== SUPER_PUBLISHER_LOGIN)
+      return reply.code(403).send({ error: 'Forbidden.' });
+    const { loginName } = z.object({ loginName: z.string().min(1).max(64) }).parse(request.body);
+    try {
+      return reply.code(201).send(await store.addApprovedPublisher(loginName, user.id));
+    } catch (error) {
+      return reply.code(errorStatus(error, 400)).send({ error: (error as Error).message });
+    }
+  });
+  app.delete('/api/approved-publishers/:id', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user || user.login !== SUPER_PUBLISHER_LOGIN)
+      return reply.code(403).send({ error: 'Forbidden.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    await store.removeApprovedPublisher(id);
+    return reply.code(204).send();
   });
   app.post('/api/lobbies', async (request, reply) => {
     const user = await sessionUser(request);
@@ -459,11 +526,27 @@ export async function buildApp() {
     const user = await sessionUser(request);
     if (!user || user.id !== userId)
       return reply.code(401).send({ error: 'Authentication required.' });
-    return db.lobby.findMany({
+    const lobbies = await db.lobby.findMany({
       where: { host: { twitchUserId: userId } },
-      include: { _count: { select: { participants: true } }, results: true },
+      include: {
+        _count: { select: { participants: true } },
+        results: true,
+        participants: {
+          include: { user: true, card: { include: { fields: true } } },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
+    return lobbies.map(({ participants, ...lobby }) => ({
+      ...lobby,
+      participants: participants.map((participant) => ({
+        participantId: participant.id,
+        displayName: participant.user?.displayName ?? participant.guestName ?? 'Gast',
+        role: participant.role,
+        completedFields: participant.card?.fields.filter((field) => field.completedAt).length ?? 0,
+        totalFields: participant.card?.fields.length ?? 0,
+      })),
+    }));
   });
   app.get('/api/statistics/:userId', async (request, reply) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);

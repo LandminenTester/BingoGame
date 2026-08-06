@@ -11,6 +11,7 @@ export interface TemplateSummary {
   name: string;
   visibility: string;
   fields: Array<{ id: string; label: string }>;
+  author?: { displayName: string; loginName: string } | null;
 }
 export interface LobbySummary {
   id: string;
@@ -37,7 +38,7 @@ async function requestJson<T>(path: string, options: RequestInit, fallback: stri
   const response = await fetch(`${apiBase}${path}`, {
     credentials: 'include',
     ...options,
-    headers: { 'content-type': 'application/json', ...options.headers },
+    headers: options.body ? { 'content-type': 'application/json', ...options.headers } : options.headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: fallback }));
@@ -68,6 +69,41 @@ export async function updateTemplate(
 }
 export async function deleteTemplate(id: string): Promise<void> {
   return requestJson(`/api/templates/${id}`, { method: 'DELETE' }, 'Could not delete template.');
+}
+export async function listPublicTemplates(search?: string): Promise<TemplateSummary[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  return requestJson(`/api/templates/public${query}`, { method: 'GET' }, 'Could not load templates.');
+}
+export async function listFavoriteTemplates(): Promise<TemplateSummary[]> {
+  return requestJson('/api/templates/favorites', { method: 'GET' }, 'Could not load favorites.');
+}
+export async function addFavoriteTemplate(id: string): Promise<void> {
+  return requestJson(`/api/templates/${id}/favorite`, { method: 'POST' }, 'Could not add favorite.');
+}
+export async function removeFavoriteTemplate(id: string): Promise<void> {
+  return requestJson(
+    `/api/templates/${id}/favorite`,
+    { method: 'DELETE' },
+    'Could not remove favorite.',
+  );
+}
+export interface ApprovedPublisher {
+  id: string;
+  loginName: string;
+  createdAt: string;
+}
+export async function listApprovedPublishers(): Promise<ApprovedPublisher[]> {
+  return requestJson('/api/approved-publishers', { method: 'GET' }, 'Could not load channel list.');
+}
+export async function addApprovedPublisher(loginName: string): Promise<ApprovedPublisher> {
+  return requestJson(
+    '/api/approved-publishers',
+    { method: 'POST', body: JSON.stringify({ loginName }) },
+    'Could not add channel.',
+  );
+}
+export async function removeApprovedPublisher(id: string): Promise<void> {
+  return requestJson(`/api/approved-publishers/${id}`, { method: 'DELETE' }, 'Could not remove channel.');
 }
 export async function createLobby(input: {
   name: string;
@@ -202,7 +238,7 @@ export function connectLobbyEvents(lobbyId: string, onEvent: (event: any) => voi
 
 export async function setLobbyStatus(
   lobbyId: string,
-  status: 'completed' | 'cancelled',
+  status: 'running' | 'completed' | 'cancelled',
 ): Promise<void> {
   const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/status`, {
     method: 'POST',
@@ -236,6 +272,13 @@ export async function getLeaderboard(lobbyId: string): Promise<LeaderboardEntry[
   if (!response.ok) throw new Error('Could not load leaderboard.');
   return response.json();
 }
+export interface HistoryParticipant {
+  participantId: string;
+  displayName: string;
+  role: 'host' | 'player';
+  completedFields: number;
+  totalFields: number;
+}
 export interface HistoryLobby {
   id: string;
   code: string;
@@ -245,6 +288,7 @@ export interface HistoryLobby {
   endedAt?: string | null;
   _count: { participants: number };
   results: Array<{ placement: number }>;
+  participants: HistoryParticipant[];
 }
 export interface ChannelStatistics {
   totalSessions: number;

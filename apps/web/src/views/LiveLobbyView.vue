@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router';
 import { useLobbyStore } from '../stores/lobby';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
+import BaseInput from '../components/BaseInput.vue';
+import BaseModal from '../components/BaseModal.vue';
 
 const props = defineProps<{ lobbyId: string }>();
 const route = useRoute();
@@ -15,6 +17,8 @@ const isHostView = computed(() => route.name === 'app-lobby');
 const codeRevealed = ref(false);
 const copied = ref(false);
 const loadError = ref('');
+const taskSearch = ref('');
+const pendingTaskIndex = ref<number | null>(null);
 
 onMounted(async () => {
   if (lobby.activeLobbyId === props.lobbyId) {
@@ -35,6 +39,31 @@ function copyCode() {
   copied.value = true;
   window.setTimeout(() => (copied.value = false), 1600);
 }
+
+const filteredTaskEntries = computed(() => {
+  const query = taskSearch.value.trim().toLowerCase();
+  return lobby.boardTasks
+    .map((task, index) => ({ task, index }))
+    .filter((entry) => !query || entry.task.toLowerCase().includes(query));
+});
+
+function requestHostToggle(index: number) {
+  pendingTaskIndex.value = index;
+}
+function confirmHostToggle() {
+  const index = pendingTaskIndex.value;
+  pendingTaskIndex.value = null;
+  if (index === null) return;
+  lobby.confirmTask(index, !lobby.marked.has(index));
+}
+
+function onTileClick(index: number) {
+  if (lobby.gameMode === 'individual') {
+    lobby.toggleField(index);
+    return;
+  }
+  if (isHostView.value && lobby.gameMode === 'streamer_controlled') requestHostToggle(index);
+}
 </script>
 
 <template>
@@ -48,6 +77,9 @@ function copyCode() {
         <h1>
           {{ t('sessionTitle').split('\n')[0] }}<br /><em>{{ t('sessionTitle').split('\n')[1] }}</em>
         </h1>
+        <p class="hint">
+          {{ lobby.gameMode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}
+        </p>
       </div>
       <div v-if="isHostView" class="session-actions">
         <button class="button" @click="lobby.endLobby()">{{ t('endSession') }}</button>
@@ -73,8 +105,8 @@ function copyCode() {
             class="tile"
             :class="{ marked: lobby.marked.has(index) }"
             :aria-pressed="lobby.marked.has(index)"
-            :disabled="lobby.gameMode !== 'individual'"
-            @click="lobby.gameMode === 'individual' && lobby.toggleField(index)"
+            :disabled="lobby.gameMode !== 'individual' && !(isHostView && lobby.gameMode === 'streamer_controlled')"
+            @click="onTileClick(index)"
           >
             <span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span
             ><span>{{ task }}</span
@@ -85,19 +117,28 @@ function copyCode() {
       <aside class="right-rail">
         <section v-if="isHostView && lobby.gameMode === 'streamer_controlled'" class="panel control-panel">
           <p class="eyebrow">{{ t('hostConsole') }}</p>
-          <h2>{{ t('confirmEvent') }}</h2>
+          <div class="task-card-toolbar">
+            <h2>{{ t('confirmEvent') }}</h2>
+          </div>
+          <BaseInput
+            v-model="taskSearch"
+            class="search-field"
+            :label="t('searchTasks')"
+            hide-label
+            :placeholder="t('searchTasks')"
+          />
           <div class="task-cards">
             <button
-              v-for="(task, index) in lobby.boardTasks"
-              :key="task + index"
+              v-for="entry in filteredTaskEntries"
+              :key="entry.task + entry.index"
               class="task-card"
-              :class="{ marked: lobby.marked.has(index) }"
-              :disabled="lobby.marked.has(index)"
+              :class="{ marked: lobby.marked.has(entry.index) }"
               type="button"
-              @click="lobby.confirmTask(index)"
+              @click="requestHostToggle(entry.index)"
             >
-              {{ task }}
+              {{ entry.task }}
             </button>
+            <p v-if="!filteredTaskEntries.length" class="muted">{{ t('noMatchingTasks') }}</p>
           </div>
           <small>{{ t('syncHint') }}</small>
         </section>
@@ -129,5 +170,14 @@ function copyCode() {
         </section>
       </aside>
     </div>
+    <BaseModal
+      v-if="pendingTaskIndex !== null"
+      :title="lobby.marked.has(pendingTaskIndex) ? t('confirmUnmarkTaskTitle') : t('confirmMarkTaskTitle')"
+      :body="lobby.marked.has(pendingTaskIndex) ? t('confirmUnmarkTaskBody') : t('confirmMarkTaskBody')"
+      :cancel-label="t('cancel')"
+      :confirm-label="t('confirmAction')"
+      @cancel="pendingTaskIndex = null"
+      @confirm="confirmHostToggle"
+    />
   </section>
 </template>

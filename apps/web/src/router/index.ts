@@ -5,6 +5,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'landing', component: () => import('../views/LandingView.vue') },
+    { path: '/impressum', name: 'imprint', component: () => import('../views/ImprintView.vue') },
+    { path: '/datenschutz', name: 'privacy', component: () => import('../views/PrivacyView.vue') },
     { path: '/lobby/join', name: 'guest-join', component: () => import('../views/GuestJoinView.vue') },
     {
       path: '/guest/lobby/:lobbyId',
@@ -19,7 +21,18 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', redirect: { name: 'templates' } },
-        { path: 'templates', name: 'templates', component: () => import('../views/TemplatesView.vue') },
+        {
+          path: 'templates',
+          name: 'templates',
+          component: () => import('../views/TemplatesView.vue'),
+          children: [
+            {
+              path: 'browse',
+              name: 'templates-browse',
+              component: () => import('../views/TemplateBrowserView.vue'),
+            },
+          ],
+        },
         {
           path: 'lobby/new',
           name: 'create-lobby',
