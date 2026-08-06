@@ -11,7 +11,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 export function beginTwitchLogin(): void { window.location.assign(`${apiBase}/api/auth/twitch/login`); }
 export async function logout(): Promise<void> { await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', credentials: 'include' }); }
 
-export interface JoinedLobby { id: string; lobbyId: string; card?: { fields: Array<{ id: string; completedAt: string | null; templateField: { label: string } }> }; }
+export interface JoinedLobby { id: string; lobbyId: string; card?: { fields: Array<{ id: string; completedAt: string | null; templateField: { id: string; label: string } }> }; }
 export async function joinLobby(code: string): Promise<JoinedLobby> {
   const response = await fetch(`${apiBase}/api/lobbies/${code}/join`, { method: 'POST', credentials: 'include' });
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not join lobby.' })); throw new Error(body.error); }
@@ -21,4 +21,9 @@ export async function joinLobby(code: string): Promise<JoinedLobby> {
 export async function markCardField(lobbyId: string, fieldId: string, completed: boolean): Promise<void> {
   const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/cards/${fieldId}`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ completed }) });
   if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not update card.' })); throw new Error(body.error); }
+}
+
+export async function confirmLobbyTask(lobbyId: string, templateFieldId: string, completed: boolean): Promise<void> {
+  const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/tasks/${templateFieldId}`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ completed }) });
+  if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not confirm task.' })); throw new Error(body.error); }
 }
