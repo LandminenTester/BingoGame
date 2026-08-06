@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { locales, resolveLocale, translate, type Locale, type TranslationKey } from './i18n';
 import { participants, rankings, tasks } from './mock';
-import { beginTwitchLogin, getCurrentUser, logout, type CurrentUser } from './api';
+import { beginTwitchLogin, getCurrentUser, joinLobby as joinLobbyRequest, logout, type CurrentUser } from './api';
 
 type View = 'dashboard' | 'join' | 'templates' | 'history' | 'stats' | 'settings';
 const view = ref<View>('dashboard');
@@ -36,10 +36,12 @@ function copyCode() {
   copied.value = true;
   window.setTimeout(() => (copied.value = false), 1600);
 }
-function submitJoin() {
+async function submitJoin() {
   const cleanCode = joinCode.value.trim().toUpperCase();
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
-  code.value = cleanCode; joinError.value = ''; view.value = 'dashboard';
+  if (!currentUser.value) { beginTwitchLogin(); return; }
+  try { await joinLobbyRequest(cleanCode); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
+  catch (error) { joinError.value = (error as Error).message; }
 }
 async function signOut() { await logout(); currentUser.value = null; }
 </script>

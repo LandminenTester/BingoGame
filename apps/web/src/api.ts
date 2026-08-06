@@ -10,3 +10,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 export function beginTwitchLogin(): void { window.location.assign(`${apiBase}/api/auth/twitch/login`); }
 export async function logout(): Promise<void> { await fetch(`${apiBase}/api/auth/logout`, { method: 'POST', credentials: 'include' }); }
+
+export async function joinLobby(code: string): Promise<void> {
+  const response = await fetch(`${apiBase}/api/lobbies/${code}/join`, { method: 'POST', credentials: 'include' });
+  if (!response.ok) { const body = await response.json().catch(() => ({ error: 'Could not join lobby.' })); throw new Error(body.error); }
+}
