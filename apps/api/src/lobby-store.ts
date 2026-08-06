@@ -285,6 +285,16 @@ export class LobbyStore {
     const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
     if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId)
       throw new Error('Only the host can change lobby status.');
+    const transitions: Record<string, string[]> = {
+      draft: ['open', 'cancelled'],
+      open: ['running', 'cancelled'],
+      running: ['paused', 'completed', 'cancelled'],
+      paused: ['running', 'completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
+    };
+    if (!transitions[lobby.status].includes(status))
+      throw new Error(`Cannot transition lobby from ${lobby.status} to ${status}.`);
     const now = new Date();
     return db.lobby.update({
       where: { id: lobbyId },

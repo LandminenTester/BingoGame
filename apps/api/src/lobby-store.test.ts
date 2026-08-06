@@ -35,6 +35,31 @@ describe('lobby store', () => {
     expect(lobby.allowLateJoin).toBe(false);
   });
 
+  it('only permits valid lobby lifecycle transitions', async () => {
+    const store = new LobbyStore();
+    const template = await store.createTemplate({ name: 'Lifecycle', fields });
+    const lobby = await store.createLobby({
+      name: 'Lifecycle',
+      templateId: template.id,
+      hostId: 'lifecycle-host',
+      gameMode: 'individual',
+      winningCondition: 'first_line',
+      maxParticipants: 2,
+    });
+    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'running')).rejects.toThrow(
+      'Cannot transition',
+    );
+    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'open')).resolves.toMatchObject({
+      status: 'open',
+    });
+    await expect(
+      store.setLobbyStatus(lobby.id, 'lifecycle-host', 'running'),
+    ).resolves.toMatchObject({ status: 'running' });
+    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'paused')).resolves.toMatchObject(
+      { status: 'paused' },
+    );
+  });
+
   it('rejects a protected lobby without the correct password', async () => {
     const store = new LobbyStore();
     const template = await store.createTemplate({ name: 'Protected', fields });
