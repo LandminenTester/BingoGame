@@ -68,6 +68,7 @@ function subscribeToLobby(lobbyId: string) {
     const id = event.templateFieldId ?? event.fieldId; if (!id || typeof event.completed !== 'boolean') return;
     const index = event.templateFieldId ? templateFieldIds.value.indexOf(id) : cardFieldIds.value.indexOf(id); if (index < 0) return;
     const next = new Set(marked.value); event.completed ? next.add(index) : next.delete(index); marked.value = next;
+    void getLeaderboard(lobbyId).then((entries) => { liveRankings.value = entries; });
   });
 }
 async function confirmSelectedTask() {
