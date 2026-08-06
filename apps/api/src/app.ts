@@ -99,6 +99,18 @@ export function buildApp() {
     const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true } });
     return { totalSessions: lobbies.length, totalParticipants: lobbies.reduce((total, lobby) => total + lobby._count.participants, 0), completedCards: lobbies.reduce((total, lobby) => total + lobby.results.length, 0) };
   });
+  app.post('/api/statistics/reset', async (request, reply) => {
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { confirm } = z.object({ confirm: z.literal(true) }).safeParse(request.body).success ? request.body as { confirm: true } : { confirm: false };
+    if (!confirm) return reply.code(400).send({ error: 'Confirmation is required to reset statistics.' });
+    const owner = await db.user.findUnique({ where: { twitchUserId: user.id } }); if (!owner) return reply.code(404).send({ error: 'User not found.' });
+    const lobbies = await db.lobby.findMany({ where: { hostId: owner.id }, select: { id: true } });
+    await db.$transaction([
+      db.lobby.deleteMany({ where: { hostId: owner.id } }),
+      db.auditEvent.create({ data: { userId: owner.id, action: 'statistics.reset', targetType: 'channel', targetId: owner.twitchUserId, metadata: { deletedLobbyCount: lobbies.length } } }),
+    ]);
+    return { reset: true, deletedLobbyCount: lobbies.length };
+  });
   app.post('/api/api-keys', async (request, reply) => {
     const { userId, name, scopes, expiresAt } = z.object({ userId: z.string(), name: z.string().min(1).max(100), scopes: z.array(z.enum(['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'])).min(1), expiresAt: z.string().datetime().optional() }).parse(request.body);
     const user = await db.user.findUnique({ where: { twitchUserId: userId } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
