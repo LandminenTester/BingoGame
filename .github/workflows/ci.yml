@@ -24,6 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @twitch-bingo/api exec prisma generate
       - run: pnpm --filter @twitch-bingo/api exec prisma migrate deploy
       - run: pnpm build
       - run: pnpm lint
