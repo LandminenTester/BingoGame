@@ -39,7 +39,7 @@ export class LobbyStore {
         userId: user.id,
         card: { create: { fields: { create: fieldOrder.map((field, position) => ({ templateFieldId: field.id, position })) } } },
       },
-      include: { card: { include: { fields: { orderBy: { position: 'asc' } } } } },
+      include: { card: { include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } } } },
     });
   }
   async markPlayerField(lobbyId: string, twitchUserId: string, fieldId: string, completed: boolean) {

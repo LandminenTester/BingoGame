@@ -14,6 +14,7 @@ const joinError = ref('');
 const copied = ref(false);
 const sessionPaused = ref(false);
 const marked = ref(new Set<number>([0, 2, 5, 8, 11, 13, 17, 22]));
+const boardTasks = ref([...tasks]);
 const currentUser = ref<CurrentUser | null>(null);
 const t = (key: TranslationKey) => translate(locale.value, key);
 const completion = computed(() => marked.value.size);
@@ -40,7 +41,7 @@ async function submitJoin() {
   const cleanCode = joinCode.value.trim().toUpperCase();
   if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(cleanCode)) { joinError.value = t('invalidCode'); return; }
   if (!currentUser.value) { beginTwitchLogin(); return; }
-  try { await joinLobbyRequest(cleanCode); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
+  try { const joined = await joinLobbyRequest(cleanCode); boardTasks.value = joined.card?.fields.map((field) => field.templateField.label) ?? boardTasks.value; marked.value = new Set(joined.card?.fields.flatMap((field, index) => field.completedAt ? [index] : []) ?? []); code.value = cleanCode; joinError.value = ''; view.value = 'dashboard'; }
   catch (error) { joinError.value = (error as Error).message; }
 }
 async function signOut() { await logout(); currentUser.value = null; }
@@ -72,7 +73,7 @@ async function signOut() { await logout(); currentUser.value = null; }
         <div class="signal-strip"><span class="pulse"></span><b>{{ sessionPaused ? t('sessionPaused') : t('signalOpen') }}</b><span>{{ t('firstLine') }}</span><button @click="copyCode">{{ t('code') }} <strong>{{ code }}</strong> · {{ copied ? t('copied') : t('copy') }}</button></div>
         <div class="board-layout">
           <section class="board-section"><div class="section-label"><span>{{ t('yourCard') }}</span><b>{{ completion }}/25 {{ t('completed') }}</b></div><div class="bingo-board" :aria-label="t('yourCard')">
-            <button v-for="(task, index) in tasks" :key="task" class="tile" :class="{ marked: marked.has(index) }" :aria-pressed="marked.has(index)" @click="toggleField(index)"><span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span><span>{{ task }}</span><i>{{ marked.has(index) ? '✓' : '+' }}</i></button>
+            <button v-for="(task, index) in boardTasks" :key="task" class="tile" :class="{ marked: marked.has(index) }" :aria-pressed="marked.has(index)" @click="toggleField(index)"><span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span><span>{{ task }}</span><i>{{ marked.has(index) ? '✓' : '+' }}</i></button>
           </div><p class="board-note">{{ t('mockMode') }}</p></section>
           <aside class="right-rail"><section class="panel control-panel"><p class="eyebrow">{{ t('hostConsole') }}</p><h2>{{ t('confirmEvent') }}</h2><select :aria-label="t('confirmEvent')"><option v-for="task in tasks.slice(0, 6)" :key="task">{{ task }}</option></select><button class="button wide">{{ t('confirm') }}</button><small>{{ t('syncHint') }}</small></section>
             <section class="panel"><div class="panel-heading"><h2>{{ t('leaderboard') }}</h2><button class="link">{{ t('viewAll') }}</button></div><ol class="ranking"><li v-for="entry in rankings" :key="entry.participantId" :class="{ winner: entry.isWinner }"><b>{{ entry.placement }}</b><span class="avatar mini">{{ entry.displayName.slice(0, 2).toUpperCase() }}</span><span>{{ entry.displayName }}<small>{{ entry.completedAt || t('inProgress') }}</small></span><strong>{{ entry.completedFields }}/25</strong></li></ol></section>

@@ -77,6 +77,7 @@ model BingoTemplateField {
   position Int
   label String @db.VarChar(160)
   createdAt DateTime @default(now())
+  cardFields PlayerCardField[]
   @@unique([templateId, position])
 }
 
@@ -134,6 +135,7 @@ model PlayerCardField {
   completedAt DateTime?
   confirmedByHost Boolean @default(false)
   card PlayerCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  templateField BingoTemplateField @relation(fields: [templateFieldId], references: [id], onDelete: Restrict)
   @@unique([cardId, position])
   @@unique([cardId, templateFieldId])
 }
