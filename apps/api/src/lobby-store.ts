@@ -73,6 +73,14 @@ export class LobbyStore {
   async leaderboard(lobbyId: string) {
     return db.bingoResult.findMany({ where: { lobbyId }, include: { participant: { include: { user: true } } }, orderBy: { placement: 'asc' } });
   }
+  async snapshot(lobbyId: string) {
+    const [lobby, leaderboard] = await Promise.all([
+      db.lobby.findUnique({ where: { id: lobbyId }, include: { participants: { include: { user: true, card: { include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } } } } } } }),
+      this.leaderboard(lobbyId),
+    ]);
+    if (!lobby) throw new Error('Lobby not found.');
+    return { lobby, leaderboard };
+  }
   async setLobbyStatus(lobbyId: string, hostTwitchUserId: string, status: 'open' | 'running' | 'paused' | 'completed' | 'cancelled') {
     const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
     if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId) throw new Error('Only the host can change lobby status.');

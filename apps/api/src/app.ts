@@ -156,11 +156,12 @@ export function buildApp() {
     try { await readApiKey(request, lobby.host.twitchUserId, 'leaderboard:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     return store.leaderboard(lobbyId);
   });
-  app.get('/api/lobbies/:lobbyId/events', { websocket: true }, (socket, request) => {
+  app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
     const room = rooms.get(lobbyId) ?? new Set(); room.add(socket); rooms.set(lobbyId, room);
     socket.on('close', () => room.delete(socket));
-    socket.send(JSON.stringify({ type: 'lobby.connected', lobbyId }));
+    try { socket.send(JSON.stringify({ type: 'lobby.snapshot', ...(await store.snapshot(lobbyId)) })); }
+    catch { socket.close(1008, 'Lobby not found'); }
   });
 
   return app;
