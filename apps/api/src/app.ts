@@ -172,6 +172,7 @@ export function buildApp() {
   });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
+    const user = sessionUser(request); if (!user || !(await store.canAccessLobby(lobbyId, user.id))) { socket.close(1008, 'Unauthorized'); return; }
     const room = rooms.get(lobbyId) ?? new Set(); room.add(socket); rooms.set(lobbyId, room);
     socket.on('close', () => room.delete(socket));
     try { socket.send(JSON.stringify({ type: 'lobby.snapshot', ...(await store.snapshot(lobbyId)) })); }

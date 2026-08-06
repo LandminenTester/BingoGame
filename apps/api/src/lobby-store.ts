@@ -95,6 +95,10 @@ export class LobbyStore {
     if (!lobby) throw new Error('Lobby not found.');
     return { lobby, leaderboard };
   }
+  async canAccessLobby(lobbyId: string, twitchUserId: string) {
+    const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true, participants: { include: { user: true } } } });
+    return Boolean(lobby && (lobby.host.twitchUserId === twitchUserId || lobby.participants.some((participant) => participant.user.twitchUserId === twitchUserId)));
+  }
   async setLobbyStatus(lobbyId: string, hostTwitchUserId: string, status: 'open' | 'running' | 'paused' | 'completed' | 'cancelled') {
     const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true } });
     if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId) throw new Error('Only the host can change lobby status.');
