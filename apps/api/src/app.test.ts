@@ -17,7 +17,16 @@ describe('health endpoints', () => {
   });
 
   it('rejects unauthenticated mutations', async () => {
-    const response = await app.inject({ method: 'POST', url: '/api/templates', payload: { name: 'Test', fields: Array.from({ length: 25 }, (_, index) => `Field ${index}`) } });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/templates',
+      payload: { name: 'Test', fields: Array.from({ length: 25 }, (_, index) => `Field ${index}`) },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('returns 401 for protected management data', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/statistics/someone' });
     expect(response.statusCode).toBe(401);
   });
 });

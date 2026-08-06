@@ -264,15 +264,13 @@ export function buildApp() {
       })
       .parse(request.body);
     try {
-      return reply
-        .code(201)
-        .send(
-          await store.createLobby({
-            ...input,
-            passwordHash: input.password ? await hashLobbyPassword(input.password) : undefined,
-            hostId: user.id,
-          }),
-        );
+      return reply.code(201).send(
+        await store.createLobby({
+          ...input,
+          passwordHash: input.password ? await hashLobbyPassword(input.password) : undefined,
+          hostId: user.id,
+        }),
+      );
     } catch (error) {
       return reply.code(400).send({ error: (error as Error).message });
     }
@@ -343,20 +341,22 @@ export function buildApp() {
       return reply.code(403).send({ error: (error as Error).message });
     }
   });
-  app.get('/api/history/hosted/:userId', async (request) => {
+  app.get('/api/history/hosted/:userId', async (request, reply) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
     const user = await sessionUser(request);
-    if (!user || user.id !== userId) return { error: 'Authentication required.' };
+    if (!user || user.id !== userId)
+      return reply.code(401).send({ error: 'Authentication required.' });
     return db.lobby.findMany({
       where: { host: { twitchUserId: userId } },
       include: { _count: { select: { participants: true } }, results: true },
       orderBy: { createdAt: 'desc' },
     });
   });
-  app.get('/api/statistics/:userId', async (request) => {
+  app.get('/api/statistics/:userId', async (request, reply) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
     const user = await sessionUser(request);
-    if (!user || user.id !== userId) return { error: 'Authentication required.' };
+    if (!user || user.id !== userId)
+      return reply.code(401).send({ error: 'Authentication required.' });
     const lobbies = await db.lobby.findMany({
       where: { host: { twitchUserId: userId } },
       include: { _count: { select: { participants: true } }, results: true },
@@ -420,10 +420,11 @@ export function buildApp() {
       .code(201)
       .send({ id: record.id, key, scopes: record.scopes, expiresAt: record.expiresAt });
   });
-  app.get('/api/api-keys/:userId', async (request) => {
+  app.get('/api/api-keys/:userId', async (request, reply) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
     const session = await sessionUser(request);
-    if (!session || session.id !== userId) return { error: 'Authentication required.' };
+    if (!session || session.id !== userId)
+      return reply.code(401).send({ error: 'Authentication required.' });
     return db.apiKey.findMany({
       where: { user: { twitchUserId: userId } },
       select: {
