@@ -7,7 +7,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import Fastify from 'fastify';
 import { z } from 'zod';
-import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId } from './auth.js';
+import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId, hashSessionId } from './auth.js';
 import { generateApiKey, hashApiKey } from './api-keys.js';
 import { db } from './db.js';
 import { LobbyStore } from './lobby-store.js';
@@ -15,8 +15,16 @@ import { LobbyStore } from './lobby-store.js';
 export function buildApp() {
   const app = Fastify({ logger: true });
   const store = new LobbyStore();
-  const sessions = new Map<string, { id: string; displayName: string; login: string; profileImageUrl?: string }>();
-  const sessionUser = (request: { cookies: Record<string, string | undefined> }) => sessions.get(request.cookies.session ?? '');
+  type SessionUser = { id: string; displayName: string; login: string; profileImageUrl?: string };
+  const sessionUser = async (request: { cookies: Record<string, string | undefined> }): Promise<SessionUser | null> => {
+    const token = request.cookies.session;
+    if (!token) return null;
+    const session = await db.userSession.findUnique({ where: { tokenHash: hashSessionId(token) }, include: { user: true } });
+    if (!session) return null;
+    if (session.expiresAt <= new Date()) { await db.userSession.delete({ where: { id: session.id } }); return null; }
+    void db.userSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
+    return { id: session.user.twitchUserId, displayName: session.user.displayName, login: session.user.loginName, profileImageUrl: session.user.profileImageUrl ?? undefined };
+  };
   const rooms = new Map<string, Set<{ readyState: number; send: (data: string) => void }>>();
   const broadcast = (lobbyId: string, event: unknown) => rooms.get(lobbyId)?.forEach((socket) => { if (socket.readyState === 1) socket.send(JSON.stringify(event)); });
   void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
@@ -53,54 +61,56 @@ export function buildApp() {
     const userResponse = await fetch('https://api.twitch.tv/helix/users', { headers: { Authorization: `Bearer ${token.access_token}`, 'Client-Id': process.env.TWITCH_CLIENT_ID! } });
     const payload = await userResponse.json() as { data?: Array<{ id: string; display_name: string; login: string; profile_image_url?: string }> };
     const user = payload.data?.[0]; if (!user) return reply.code(401).send({ error: 'Twitch user lookup failed.' });
-    const sessionId = createSessionId(); sessions.set(sessionId, { id: user.id, displayName: user.display_name, login: user.login, profileImageUrl: user.profile_image_url });
+    const storedUser = await db.user.upsert({ where: { twitchUserId: user.id }, update: { displayName: user.display_name, loginName: user.login, profileImageUrl: user.profile_image_url }, create: { twitchUserId: user.id, displayName: user.display_name, loginName: user.login, profileImageUrl: user.profile_image_url } });
+    const sessionId = createSessionId();
+    await db.userSession.create({ data: { userId: storedUser.id, tokenHash: hashSessionId(sessionId), expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14) } });
     reply.clearCookie('twitch_oauth_state', { path: '/api/auth/twitch' }).clearCookie('twitch_oauth_verifier', { path: '/api/auth/twitch' });
     reply.setCookie('session', sessionId, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' });
     return reply.redirect(process.env.WEB_ORIGIN ?? '/');
   });
-  app.get('/api/auth/me', async (request) => sessions.get(request.cookies.session ?? '') ?? null);
-  app.post('/api/auth/logout', async (request, reply) => { sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send(); });
+  app.get('/api/auth/me', async (request) => await sessionUser(request));
+  app.post('/api/auth/logout', async (request, reply) => { const token = request.cookies.session; if (token) await db.userSession.deleteMany({ where: { tokenHash: hashSessionId(token) } }); reply.clearCookie('session', { path: '/' }); return reply.code(204).send(); });
   app.delete('/api/account', async (request, reply) => {
-    const session = sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
+    const session = await sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
     const user = await db.user.findUnique({ where: { twitchUserId: session.id }, include: { _count: { select: { hostedLobbies: true } } } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
     if (user._count.hostedLobbies) return reply.code(409).send({ error: 'End or delete hosted lobbies before deleting the account.' });
-    await db.user.delete({ where: { id: user.id } }); sessions.delete(request.cookies.session ?? ''); reply.clearCookie('session', { path: '/' }); return reply.code(204).send();
+    await db.user.delete({ where: { id: user.id } }); reply.clearCookie('session', { path: '/' }); return reply.code(204).send();
   });
-  app.get('/api/templates', async (request) => await store.listTemplates(sessionUser(request)?.id));
+  app.get('/api/templates', async (request) => await store.listTemplates((await sessionUser(request))?.id));
   app.post('/api/templates', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
     try { return reply.code(201).send(await store.createTemplate({ ...input, authorId: user.id })); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.put('/api/templates/:id', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { id } = z.object({ id: z.string() }).parse(request.params); const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
     try { return await store.updateTemplate(id, user.id, input); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.delete('/api/templates/:id', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { id } = z.object({ id: z.string() }).parse(request.params);
     try { await store.deleteTemplate(id, user.id); return reply.code(204).send(); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const input = z.object({ name: z.string().min(1).max(100), templateId: z.string(), gameMode: z.enum(['individual', 'streamer_controlled']), winningCondition: z.enum(['first_line', 'full_card']), maxParticipants: z.number().int().min(1).max(1000) }).parse(request.body);
     try { return reply.code(201).send(await store.createLobby({ ...input, hostId: user.id })); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:code/join', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { code } = z.object({ code: z.string().length(6) }).parse(request.params);
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     try { return await store.joinLobby(code, user.id); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:lobbyId/cards/:fieldId', async (request, reply) => {
     const { lobbyId, fieldId } = z.object({ lobbyId: z.string(), fieldId: z.string() }).parse(request.params);
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { completed } = z.object({ completed: z.boolean() }).parse(request.body);
     try { const result = await store.markPlayerField(lobbyId, user.id, fieldId, completed); broadcast(lobbyId, { type: 'lobby.card_updated', fieldId, completed, result }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:lobbyId/tasks/:templateFieldId', async (request, reply) => {
     const { lobbyId, templateFieldId } = z.object({ lobbyId: z.string(), templateFieldId: z.string() }).parse(request.params);
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { completed } = z.object({ completed: z.boolean() }).parse(request.body);
     try { const result = await store.confirmLobbyTask(lobbyId, user.id, templateFieldId, completed); broadcast(lobbyId, { type: 'lobby.task_updated', templateFieldId, completed }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
@@ -109,23 +119,23 @@ export function buildApp() {
     return store.leaderboard(lobbyId);
   });
   app.post('/api/lobbies/:lobbyId/status', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params); const { status } = z.object({ status: z.enum(['open', 'running', 'paused', 'completed', 'cancelled']) }).parse(request.body);
     try { const lobby = await store.setLobbyStatus(lobbyId, user.id, status); broadcast(lobbyId, { type: 'lobby.status_updated', status }); return lobby; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.get('/api/history/hosted/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
-    const user = sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
+    const user = await sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
     return db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true }, orderBy: { createdAt: 'desc' } });
   });
   app.get('/api/statistics/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
-    const user = sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
+    const user = await sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
     const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true } });
     return { totalSessions: lobbies.length, totalParticipants: lobbies.reduce((total, lobby) => total + lobby._count.participants, 0), completedCards: lobbies.reduce((total, lobby) => total + lobby.results.length, 0) };
   });
   app.post('/api/statistics/reset', async (request, reply) => {
-    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const user = await sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const { confirm } = z.object({ confirm: z.literal(true) }).safeParse(request.body).success ? request.body as { confirm: true } : { confirm: false };
     if (!confirm) return reply.code(400).send({ error: 'Confirmation is required to reset statistics.' });
     const owner = await db.user.findUnique({ where: { twitchUserId: user.id } }); if (!owner) return reply.code(404).send({ error: 'User not found.' });
@@ -137,7 +147,7 @@ export function buildApp() {
     return { reset: true, deletedLobbyCount: lobbies.length };
   });
   app.post('/api/api-keys', async (request, reply) => {
-    const session = sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
+    const session = await sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
     const { name, scopes, expiresAt } = z.object({ name: z.string().min(1).max(100), scopes: z.array(z.enum(['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'])).min(1), expiresAt: z.string().datetime().optional() }).parse(request.body);
     const user = await db.user.findUnique({ where: { twitchUserId: session.id } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
     const key = generateApiKey(); const record = await db.apiKey.create({ data: { userId: user.id, name, scopes, keyHash: hashApiKey(key), expiresAt: expiresAt ? new Date(expiresAt) : undefined } });
@@ -145,17 +155,17 @@ export function buildApp() {
   });
   app.get('/api/api-keys/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
-    const session = sessionUser(request); if (!session || session.id !== userId) return { error: 'Authentication required.' };
+    const session = await sessionUser(request); if (!session || session.id !== userId) return { error: 'Authentication required.' };
     return db.apiKey.findMany({ where: { user: { twitchUserId: userId } }, select: { id: true, name: true, scopes: true, createdAt: true, expiresAt: true, lastUsedAt: true, revokedAt: true } });
   });
   app.post('/api/api-keys/:id/revoke', async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const session = sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
+    const session = await sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
     return db.apiKey.update({ where: { id }, data: { revokedAt: new Date() }, select: { id: true, revokedAt: true } });
   });
   app.post('/api/api-keys/:id/regenerate', async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const session = sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
+    const session = await sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
     const rawKey = generateApiKey(); const updated = await db.apiKey.update({ where: { id }, data: { keyHash: hashApiKey(rawKey), revokedAt: null, lastUsedAt: null } });
     return { id: updated.id, key: rawKey, scopes: updated.scopes, expiresAt: updated.expiresAt };
   });
@@ -197,7 +207,7 @@ export function buildApp() {
   });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
-    const user = sessionUser(request); if (!user || !(await store.canAccessLobby(lobbyId, user.id))) { socket.close(1008, 'Unauthorized'); return; }
+    const user = await sessionUser(request); if (!user || !(await store.canAccessLobby(lobbyId, user.id))) { socket.close(1008, 'Unauthorized'); return; }
     const room = rooms.get(lobbyId) ?? new Set(); room.add(socket); rooms.set(lobbyId, room);
     socket.on('close', () => room.delete(socket));
     try { socket.send(JSON.stringify({ type: 'lobby.snapshot', ...(await store.snapshot(lobbyId)) })); }
