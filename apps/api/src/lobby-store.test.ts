@@ -59,4 +59,22 @@ describe('lobby store', () => {
       store.updateTemplate(template.id, 'immutable-host', { name: 'Changed', fields }),
     ).rejects.toThrow('cannot be edited');
   });
+
+  it('permits direct access to an unlisted template but not private templates', async () => {
+    const store = new LobbyStore();
+    const unlisted = await store.createTemplate({
+      name: 'Unlisted',
+      fields,
+      visibility: 'unlisted',
+      authorId: 'unlisted-owner',
+    });
+    const privateTemplate = await store.createTemplate({
+      name: 'Private',
+      fields,
+      visibility: 'private',
+      authorId: 'private-owner',
+    });
+    await expect(store.getTemplate(unlisted.id)).resolves.toMatchObject({ id: unlisted.id });
+    await expect(store.getTemplate(privateTemplate.id)).rejects.toThrow('Template not found');
+  });
 });

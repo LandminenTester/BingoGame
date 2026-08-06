@@ -57,6 +57,17 @@ export class LobbyStore {
       orderBy: { createdAt: 'desc' },
     });
   }
+  async getTemplate(id: string, twitchUserId?: string) {
+    const template = await db.bingoTemplate.findUnique({
+      where: { id },
+      include: { author: true, fields: { orderBy: { position: 'asc' } } },
+    });
+    if (!template) throw new Error('Template not found.');
+    const owned = template.author?.twitchUserId === twitchUserId;
+    if (!owned && !['public', 'unlisted', 'predefined'].includes(template.visibility))
+      throw new Error('Template not found.');
+    return template;
+  }
   async updateTemplate(id: string, twitchUserId: string, input: TemplateInput) {
     if (input.fields.length !== 25 || input.fields.some((field) => !field.trim()))
       throw new Error('Templates require exactly 25 non-empty fields.');

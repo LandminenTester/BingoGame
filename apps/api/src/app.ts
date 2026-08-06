@@ -206,6 +206,14 @@ export function buildApp() {
     '/api/templates',
     async (request) => await store.listTemplates((await sessionUser(request))?.id),
   );
+  app.get('/api/templates/:id', async (request, reply) => {
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    try {
+      return await store.getTemplate(id, (await sessionUser(request))?.id);
+    } catch (error) {
+      return reply.code(404).send({ error: (error as Error).message });
+    }
+  });
   app.post('/api/templates', async (request, reply) => {
     const user = await sessionUser(request);
     if (!user) return reply.code(401).send({ error: 'Authentication required.' });
