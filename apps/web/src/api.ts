@@ -75,6 +75,7 @@ export async function createLobby(input: {
   winningCondition: 'first_line' | 'full_card';
   maxParticipants: number;
   password?: string;
+  allowLateJoin?: boolean;
 }): Promise<LobbySummary> {
   return requestJson(
     '/api/lobbies',

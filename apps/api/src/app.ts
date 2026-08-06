@@ -269,6 +269,7 @@ export function buildApp() {
         winningCondition: z.enum(['first_line', 'full_card']),
         maxParticipants: z.number().int().min(1).max(1000),
         password: z.string().min(8).max(128).optional(),
+        allowLateJoin: z.boolean().optional(),
       })
       .parse(request.body);
     try {

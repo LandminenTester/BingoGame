@@ -22,6 +22,7 @@ export interface LobbyInput {
   winningCondition: WinningCondition;
   maxParticipants: number;
   passwordHash?: string;
+  allowLateJoin?: boolean;
 }
 
 async function ensureUser(id: string) {
@@ -118,6 +119,7 @@ export class LobbyStore {
             winningCondition: input.winningCondition,
             maxParticipants: input.maxParticipants,
             passwordHash: input.passwordHash,
+            allowLateJoin: input.allowLateJoin ?? true,
           },
         });
         const { passwordHash: _passwordHash, ...safeLobby } = lobby;

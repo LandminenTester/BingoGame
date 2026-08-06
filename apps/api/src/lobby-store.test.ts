@@ -20,6 +20,21 @@ describe('lobby store', () => {
     expect(joined.card?.fields).toHaveLength(25);
   });
 
+  it('stores the host late-join setting', async () => {
+    const store = new LobbyStore();
+    const template = await store.createTemplate({ name: 'No late join', fields });
+    const lobby = await store.createLobby({
+      name: 'Closed',
+      templateId: template.id,
+      hostId: 'late-join-host',
+      gameMode: 'individual',
+      winningCondition: 'first_line',
+      maxParticipants: 2,
+      allowLateJoin: false,
+    });
+    expect(lobby.allowLateJoin).toBe(false);
+  });
+
   it('rejects a protected lobby without the correct password', async () => {
     const store = new LobbyStore();
     const template = await store.createTemplate({ name: 'Protected', fields });

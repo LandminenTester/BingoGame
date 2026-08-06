@@ -65,6 +65,7 @@ const lobbyMode = ref<'individual' | 'streamer_controlled'>('streamer_controlled
 const lobbyWin = ref<'first_line' | 'full_card'>('first_line');
 const lobbyLimit = ref(100);
 const lobbyPassword = ref('');
+const lobbyAllowLateJoin = ref(true);
 const history = ref<HistoryLobby[]>([]);
 const statistics = ref<ChannelStatistics | null>(null);
 const apiKeys = ref<ApiKeySummary[]>([]);
@@ -239,6 +240,7 @@ async function submitLobby() {
       winningCondition: lobbyWin.value,
       maxParticipants: lobbyLimit.value,
       password: lobbyPassword.value || undefined,
+      allowLateJoin: lobbyAllowLateJoin.value,
     });
     await setLobbyStatus(lobby.id, 'open');
     const joined = await joinLobbyRequest(lobby.code, lobbyPassword.value || undefined);
@@ -590,6 +592,10 @@ async function toggleSessionPause() {
                 maxlength="128"
                 autocomplete="new-password"
             /></label>
+            <label
+              ><input v-model="lobbyAllowLateJoin" type="checkbox" /> Späte Beitritte
+              erlauben</label
+            >
             <button class="button">Lobby erstellen</button>
           </form>
         </template>
