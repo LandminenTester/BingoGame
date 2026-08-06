@@ -62,6 +62,16 @@ export function buildApp() {
     const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
     try { return reply.code(201).send(await store.createTemplate({ ...input, authorId: user.id })); } catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   });
+  app.put('/api/templates/:id', async (request, reply) => {
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params); const input = z.object({ name: z.string().min(1).max(100), fields: z.array(z.string().max(160)).length(25), visibility: z.enum(['private', 'public', 'unlisted']).optional() }).parse(request.body);
+    try { return await store.updateTemplate(id, user.id, input); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+  });
+  app.delete('/api/templates/:id', async (request, reply) => {
+    const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    try { await store.deleteTemplate(id, user.id); return reply.code(204).send(); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+  });
   app.post('/api/lobbies', async (request, reply) => {
     const user = sessionUser(request); if (!user) return reply.code(401).send({ error: 'Authentication required.' });
     const input = z.object({ name: z.string().min(1).max(100), templateId: z.string(), gameMode: z.enum(['individual', 'streamer_controlled']), winningCondition: z.enum(['first_line', 'full_card']), maxParticipants: z.number().int().min(1).max(1000) }).parse(request.body);

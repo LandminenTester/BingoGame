@@ -17,6 +17,18 @@ export class LobbyStore {
   listTemplates(twitchUserId?: string) {
     return db.bingoTemplate.findMany({ where: twitchUserId ? { OR: [{ visibility: 'public' }, { author: { twitchUserId } }] } : { visibility: 'public' }, include: { fields: { orderBy: { position: 'asc' } } }, orderBy: { createdAt: 'desc' } });
   }
+  async updateTemplate(id: string, twitchUserId: string, input: TemplateInput) {
+    if (input.fields.length !== 25 || input.fields.some((field) => !field.trim())) throw new Error('Templates require exactly 25 non-empty fields.');
+    const template = await db.bingoTemplate.findUnique({ where: { id }, include: { author: true } });
+    if (!template || template.author?.twitchUserId !== twitchUserId) throw new Error('Template not found or forbidden.');
+    return db.$transaction(async (tx) => { await tx.bingoTemplateField.deleteMany({ where: { templateId: id } }); return tx.bingoTemplate.update({ where: { id }, data: { name: input.name, visibility: input.visibility ?? template.visibility, fields: { create: input.fields.map((label, position) => ({ label, position })) } }, include: { fields: { orderBy: { position: 'asc' } } } }); });
+  }
+  async deleteTemplate(id: string, twitchUserId: string) {
+    const template = await db.bingoTemplate.findUnique({ where: { id }, include: { author: true, _count: { select: { lobbies: true } } } });
+    if (!template || template.author?.twitchUserId !== twitchUserId) throw new Error('Template not found or forbidden.');
+    if (template._count.lobbies) throw new Error('Templates used by a lobby cannot be deleted.');
+    await db.bingoTemplate.delete({ where: { id } });
+  }
   async createLobby(input: LobbyInput) {
     const template = await db.bingoTemplate.findUnique({ where: { id: input.templateId } });
     if (!template) throw new Error('Template not found.');
