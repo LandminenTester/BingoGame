@@ -17,6 +17,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.1.0",
+    "@fastify/websocket": "^11.3.0",
     "@prisma/client": "^6.19.3",
     "@twitch-bingo/contracts": "workspace:*",
     "dotenv": "^17.4.2",

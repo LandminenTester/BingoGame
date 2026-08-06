@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { createOAuthState, createPkceChallenge, createPkceVerifier, createSessionId } from './auth.js';
@@ -9,8 +10,11 @@ export function buildApp() {
   const app = Fastify({ logger: true });
   const store = new LobbyStore();
   const sessions = new Map<string, { id: string; displayName: string; login: string; profileImageUrl?: string }>();
+  const rooms = new Map<string, Set<{ readyState: number; send: (data: string) => void }>>();
+  const broadcast = (lobbyId: string, event: unknown) => rooms.get(lobbyId)?.forEach((socket) => { if (socket.readyState === 1) socket.send(JSON.stringify(event)); });
   void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
   void app.register(cookie);
+  void app.register(websocket);
 
   app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
   app.get('/ready', async () => ({ status: 'ready', dependencies: { database: 'not-configured' } }));
@@ -59,16 +63,22 @@ export function buildApp() {
   app.post('/api/lobbies/:lobbyId/cards/:fieldId', async (request, reply) => {
     const { lobbyId, fieldId } = z.object({ lobbyId: z.string(), fieldId: z.string() }).parse(request.params);
     const { userId, completed } = z.object({ userId: z.string(), completed: z.boolean() }).parse(request.body);
-    try { return await store.markPlayerField(lobbyId, userId, fieldId, completed); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    try { const result = await store.markPlayerField(lobbyId, userId, fieldId, completed); broadcast(lobbyId, { type: 'lobby.card_updated', fieldId, completed, result }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.post('/api/lobbies/:lobbyId/tasks/:templateFieldId', async (request, reply) => {
     const { lobbyId, templateFieldId } = z.object({ lobbyId: z.string(), templateFieldId: z.string() }).parse(request.params);
     const { hostId, completed } = z.object({ hostId: z.string(), completed: z.boolean() }).parse(request.body);
-    try { return await store.confirmLobbyTask(lobbyId, hostId, templateFieldId, completed); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    try { const result = await store.confirmLobbyTask(lobbyId, hostId, templateFieldId, completed); broadcast(lobbyId, { type: 'lobby.task_updated', templateFieldId, completed }); return result; } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
   });
   app.get('/api/lobbies/:lobbyId/leaderboard', async (request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
     return store.leaderboard(lobbyId);
+  });
+  app.get('/api/lobbies/:lobbyId/events', { websocket: true }, (socket, request) => {
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
+    const room = rooms.get(lobbyId) ?? new Set(); room.add(socket); rooms.set(lobbyId, room);
+    socket.on('close', () => room.delete(socket));
+    socket.send(JSON.stringify({ type: 'lobby.connected', lobbyId }));
   });
 
   return app;
