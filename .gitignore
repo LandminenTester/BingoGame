@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+.pnpm-store/
+coverage/
+*.log
+apps/api/prisma/dev.db
