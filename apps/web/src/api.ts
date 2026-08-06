@@ -61,6 +61,7 @@ export async function createLobby(input: {
   gameMode: 'individual' | 'streamer_controlled';
   winningCondition: 'first_line' | 'full_card';
   maxParticipants: number;
+  password?: string;
 }): Promise<LobbySummary> {
   return requestJson(
     '/api/lobbies',
@@ -87,10 +88,12 @@ export interface JoinedLobby {
     }>;
   };
 }
-export async function joinLobby(code: string): Promise<JoinedLobby> {
+export async function joinLobby(code: string, password?: string): Promise<JoinedLobby> {
   const response = await fetch(`${apiBase}/api/lobbies/${code}/join`, {
     method: 'POST',
     credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(password ? { password } : {}),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: 'Could not join lobby.' }));

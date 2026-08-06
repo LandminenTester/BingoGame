@@ -37,6 +37,7 @@ const theme = ref<'dark' | 'light'>(
 );
 const code = ref('XAS7PK');
 const joinCode = ref('');
+const joinPassword = ref('');
 const joinError = ref('');
 const copied = ref(false);
 const sessionPaused = ref(false);
@@ -60,6 +61,7 @@ const lobbyTemplateId = ref('');
 const lobbyMode = ref<'individual' | 'streamer_controlled'>('streamer_controlled');
 const lobbyWin = ref<'first_line' | 'full_card'>('first_line');
 const lobbyLimit = ref(100);
+const lobbyPassword = ref('');
 const history = ref<HistoryLobby[]>([]);
 const statistics = ref<ChannelStatistics | null>(null);
 const apiKeys = ref<ApiKeySummary[]>([]);
@@ -125,7 +127,7 @@ async function submitJoin() {
     return;
   }
   try {
-    const joined = await joinLobbyRequest(cleanCode);
+    const joined = await joinLobbyRequest(cleanCode, joinPassword.value || undefined);
     activeLobbyId.value = joined.lobbyId;
     cardFieldIds.value = joined.card?.fields.map((field) => field.id) ?? [];
     templateFieldIds.value = joined.card?.fields.map((field) => field.templateField.id) ?? [];
@@ -210,6 +212,7 @@ async function submitLobby() {
       gameMode: lobbyMode.value,
       winningCondition: lobbyWin.value,
       maxParticipants: lobbyLimit.value,
+      password: lobbyPassword.value || undefined,
     });
     await setLobbyStatus(lobby.id, 'open');
     activeLobbyId.value = lobby.id;
@@ -449,6 +452,12 @@ async function toggleSessionPause() {
               autocomplete="off"
               @input="joinCode = joinCode.toUpperCase()"
           /></label>
+          <label
+            >Passwort (falls gesetzt)<input
+              v-model="joinPassword"
+              type="password"
+              autocomplete="current-password"
+          /></label>
           <p v-if="joinError" class="error" role="alert">{{ joinError }}</p>
           <button class="button wide">{{ t('joinAction') }}</button>
         </form>
@@ -521,6 +530,14 @@ async function toggleSessionPause() {
             >
             <label
               >Teilnehmerlimit<input v-model.number="lobbyLimit" type="number" min="1" max="1000"
+            /></label>
+            <label
+              >Passwort (optional, mindestens 8 Zeichen)<input
+                v-model="lobbyPassword"
+                type="password"
+                minlength="8"
+                maxlength="128"
+                autocomplete="new-password"
             /></label>
             <button class="button">Lobby erstellen</button>
           </form>

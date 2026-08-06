@@ -24,6 +24,7 @@
     "@fastify/websocket": "^11.3.0",
     "@prisma/client": "^6.19.3",
     "@twitch-bingo/contracts": "workspace:*",
+    "argon2": "^0.45.1",
     "dotenv": "^17.4.2",
     "fastify": "^5.5.0",
     "zod": "^4.1.3"
