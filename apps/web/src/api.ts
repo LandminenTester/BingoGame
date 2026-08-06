@@ -20,6 +20,7 @@ export interface LobbySummary {
   gameMode: 'individual' | 'streamer_controlled';
   winningCondition: 'first_line' | 'full_card';
   maxParticipants: number;
+  allowGuests: boolean;
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -76,6 +77,7 @@ export async function createLobby(input: {
   maxParticipants: number;
   password?: string;
   allowLateJoin?: boolean;
+  allowGuests?: boolean;
 }): Promise<LobbySummary> {
   return requestJson(
     '/api/lobbies',
@@ -113,6 +115,40 @@ export async function joinLobby(code: string, password?: string): Promise<Joined
     const body = await response.json().catch(() => ({ error: 'Could not join lobby.' }));
     throw new Error(body.error);
   }
+  return response.json();
+}
+
+export interface GuestSession {
+  participantId: string;
+  lobbyId: string;
+  displayName: string;
+  card?: JoinedLobby['card'];
+}
+export async function guestJoinLobby(
+  code: string,
+  displayName: string,
+  password?: string,
+): Promise<GuestSession> {
+  const response = await fetch(`${apiBase}/api/lobbies/${code}/guest-join`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(password ? { displayName, password } : { displayName }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: 'Could not join lobby.' }));
+    const error = new Error(body.error ?? 'Could not join lobby.');
+    (error as Error & { code?: string }).code = body.error;
+    throw error;
+  }
+  return response.json();
+}
+export async function getGuestSession(lobbyId: string): Promise<GuestSession | null> {
+  const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/guest-session`, {
+    credentials: 'include',
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error('Could not restore guest session.');
   return response.json();
 }
 
@@ -166,7 +202,7 @@ export function connectLobbyEvents(lobbyId: string, onEvent: (event: any) => voi
 
 export async function setLobbyStatus(
   lobbyId: string,
-  status: 'open' | 'running' | 'paused' | 'completed',
+  status: 'completed' | 'cancelled',
 ): Promise<void> {
   const response = await fetch(`${apiBase}/api/lobbies/${lobbyId}/status`, {
     method: 'POST',
@@ -178,6 +214,12 @@ export async function setLobbyStatus(
     const body = await response.json().catch(() => ({ error: 'Could not update lobby.' }));
     throw new Error(body.error);
   }
+}
+export interface LobbyMember {
+  participantId: string;
+  displayName: string;
+  role: 'host' | 'player';
+  joinedAt: string;
 }
 export interface LeaderboardEntry {
   placement: number;
@@ -192,15 +234,7 @@ export async function getLeaderboard(lobbyId: string): Promise<LeaderboardEntry[
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Could not load leaderboard.');
-  const rows = await response.json();
-  return rows.map((row: any) => ({
-    placement: row.placement,
-    participantId: row.participantId,
-    displayName: row.participant.user.displayName,
-    completedAt: row.completedAt,
-    completedFields: row.completedFields,
-    isWinner: row.isWinner,
-  }));
+  return response.json();
 }
 export interface HistoryLobby {
   id: string;

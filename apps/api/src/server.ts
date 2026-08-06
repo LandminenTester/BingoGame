@@ -33,7 +33,7 @@ const environment = z
   });
 
 const { API_PORT } = environment.parse(process.env);
-const app = buildApp();
+const app = await buildApp();
 
 app.listen({ host: '0.0.0.0', port: API_PORT }).catch((error) => {
   app.log.error(error);

@@ -5,6 +5,7 @@ import {
   type GameMode,
   type WinningCondition,
 } from '@twitch-bingo/contracts';
+import { createSessionId, hashSessionId } from './auth.js';
 import { db } from './db.js';
 import { verifyLobbyPassword } from './password.js';
 
@@ -23,7 +24,15 @@ export interface LobbyInput {
   maxParticipants: number;
   passwordHash?: string;
   allowLateJoin?: boolean;
+  allowGuests?: boolean;
 }
+
+/** A participant is identified either by their Twitch session or by a guest participantId resolved from a guest cookie. */
+export type LobbyIdentity =
+  | { kind: 'twitch'; twitchUserId: string }
+  | { kind: 'guest'; participantId: string };
+
+const GUEST_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 async function ensureUser(id: string) {
   return db.user.upsert({
@@ -128,6 +137,7 @@ export class LobbyStore {
     const template = await db.bingoTemplate.findUnique({ where: { id: input.templateId } });
     if (!template) throw new Error('Template not found.');
     const host = await ensureUser(input.hostId);
+    const now = new Date();
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         const lobby = await db.lobby.create({
@@ -141,6 +151,11 @@ export class LobbyStore {
             maxParticipants: input.maxParticipants,
             passwordHash: input.passwordHash,
             allowLateJoin: input.allowLateJoin ?? true,
+            allowGuests: input.allowGuests ?? false,
+            // A lobby is playable as soon as it exists - there is no separate
+            // "start session" step for the host to click through.
+            status: 'running',
+            startedAt: now,
           },
         });
         const { passwordHash: _passwordHash, ...safeLobby } = lobby;
@@ -162,11 +177,12 @@ export class LobbyStore {
     if (!lobby) throw new Error('Lobby not found.');
     if (lobby.passwordHash && !(await verifyLobbyPassword(lobby.passwordHash, password)))
       throw new Error('Invalid lobby password.');
-    if (lobby.status === 'running' && !lobby.allowLateJoin)
+    const user = await ensureUser(twitchUserId);
+    // The host joining their freshly-created (already-running) lobby is not a "late" join.
+    if (lobby.status === 'running' && !lobby.allowLateJoin && lobby.hostId !== user.id)
       throw new Error('Late joining is disabled for this lobby.');
     if (['completed', 'cancelled'].includes(lobby.status))
       throw new Error('This lobby is no longer available.');
-    const user = await ensureUser(twitchUserId);
     const existing = await db.lobbyParticipant.findUnique({
       where: { lobbyId_userId: { lobbyId: lobby.id, userId: user.id } },
       include: {
@@ -214,16 +230,120 @@ export class LobbyStore {
       },
     });
   }
+  /** Guest join by lobby code. Rejoins the same participant if `existingTokenRaw` resolves to a live token for this lobby. */
+  async ensureGuestParticipant(
+    code: string,
+    displayName: string,
+    password?: string,
+    existingTokenRaw?: string,
+  ) {
+    const lobby = await db.lobby.findUnique({
+      where: { code: code.toUpperCase() },
+      include: {
+        template: { include: { fields: { orderBy: { position: 'asc' } } } },
+        participants: true,
+      },
+    });
+    if (!lobby) throw new Error('Lobby not found.');
+
+    if (existingTokenRaw) {
+      const rejoined = await this.resolveGuestSession(lobby.id, existingTokenRaw);
+      if (rejoined) return { participant: rejoined, rawToken: existingTokenRaw, lobbyId: lobby.id };
+    }
+
+    if (!lobby.allowGuests) throw new Error('guests_not_allowed');
+    if (lobby.passwordHash && !(await verifyLobbyPassword(lobby.passwordHash, password)))
+      throw new Error('Invalid lobby password.');
+    if (lobby.status === 'running' && !lobby.allowLateJoin)
+      throw new Error('Late joining is disabled for this lobby.');
+    if (['completed', 'cancelled'].includes(lobby.status))
+      throw new Error('This lobby is no longer available.');
+    if (lobby.participants.length >= lobby.maxParticipants) throw new Error('Lobby is full.');
+
+    const fieldOrder = shuffleCard(lobby.template.fields);
+    const events =
+      lobby.gameMode === 'streamer_controlled'
+        ? await db.lobbyEvent.findMany({
+            where: { lobbyId: lobby.id },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [];
+    const confirmed = new Set<string>();
+    for (const event of events)
+      event.completed
+        ? confirmed.add(event.templateFieldId)
+        : confirmed.delete(event.templateFieldId);
+
+    const rawToken = createSessionId();
+    const participant = await db.lobbyParticipant.create({
+      data: {
+        lobbyId: lobby.id,
+        guestName: displayName,
+        card: {
+          create: {
+            fields: {
+              create: fieldOrder.map((field, position) => ({
+                templateFieldId: field.id,
+                position,
+                completedAt: confirmed.has(field.id) ? new Date() : undefined,
+                confirmedByHost: confirmed.has(field.id),
+              })),
+            },
+          },
+        },
+        guestToken: {
+          create: {
+            tokenHash: hashSessionId(rawToken),
+            expiresAt: new Date(Date.now() + GUEST_TOKEN_TTL_MS),
+          },
+        },
+      },
+      include: {
+        card: {
+          include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } },
+        },
+      },
+    });
+    return { participant, rawToken, lobbyId: lobby.id };
+  }
+  /** Resolves a raw guest token to its participant, scoped to `lobbyId`. Returns null if invalid/expired/mismatched. */
+  async resolveGuestSession(lobbyId: string, tokenRaw: string) {
+    const token = await db.guestToken.findUnique({
+      where: { tokenHash: hashSessionId(tokenRaw) },
+      include: {
+        participant: {
+          include: {
+            card: {
+              include: { fields: { include: { templateField: true }, orderBy: { position: 'asc' } } },
+            },
+          },
+        },
+      },
+    });
+    if (!token || token.expiresAt <= new Date() || token.participant.lobbyId !== lobbyId) return null;
+    return token.participant;
+  }
+  private async findParticipant(lobbyId: string, identity: LobbyIdentity) {
+    if (identity.kind === 'guest') {
+      const participant = await db.lobbyParticipant.findUnique({
+        where: { id: identity.participantId },
+      });
+      return participant && participant.lobbyId === lobbyId ? participant : null;
+    }
+    const user = await db.user.findUnique({ where: { twitchUserId: identity.twitchUserId } });
+    if (!user) return null;
+    return db.lobbyParticipant.findUnique({ where: { lobbyId_userId: { lobbyId, userId: user.id } } });
+  }
   async markPlayerField(
     lobbyId: string,
-    twitchUserId: string,
+    identity: LobbyIdentity,
     fieldId: string,
     completed: boolean,
   ) {
-    const user = await db.user.findUnique({ where: { twitchUserId } });
-    if (!user) throw new Error('Participant not found.');
+    const participantRef = await this.findParticipant(lobbyId, identity);
+    if (!participantRef) throw new Error('Participant not found.');
     const participant = await db.lobbyParticipant.findUnique({
-      where: { lobbyId_userId: { lobbyId, userId: user.id } },
+      where: { id: participantRef.id },
       include: { card: { include: { fields: true } }, lobby: true },
     });
     if (!participant?.card) throw new Error('Player card not found.');
@@ -264,11 +384,15 @@ export class LobbyStore {
     return Promise.all(participants.map((participant) => this.recordResult(participant.id)));
   }
   async leaderboard(lobbyId: string) {
-    return db.bingoResult.findMany({
+    const results = await db.bingoResult.findMany({
       where: { lobbyId },
       include: { participant: { include: { user: true } } },
       orderBy: { placement: 'asc' },
     });
+    return results.map(({ participant, ...result }) => ({
+      ...result,
+      displayName: participant.user?.displayName ?? participant.guestName ?? 'Gast',
+    }));
   }
   async snapshot(lobbyId: string) {
     const [lobby, leaderboard] = await Promise.all([
@@ -290,17 +414,27 @@ export class LobbyStore {
       this.leaderboard(lobbyId),
     ]);
     if (!lobby) throw new Error('Lobby not found.');
-    return { lobby, leaderboard };
+    const members = lobby.participants.map((participant) => ({
+      participantId: participant.id,
+      displayName: participant.user?.displayName ?? participant.guestName ?? 'Gast',
+      role: participant.role,
+      joinedAt: participant.joinedAt,
+    }));
+    return { lobby, leaderboard, members };
   }
-  async canAccessLobby(lobbyId: string, twitchUserId: string) {
+  async canAccessLobby(lobbyId: string, identity: LobbyIdentity) {
     const lobby = await db.lobby.findUnique({
       where: { id: lobbyId },
       include: { host: true, participants: { include: { user: true } } },
     });
+    if (!lobby) return false;
+    if (identity.kind === 'guest')
+      return lobby.participants.some((participant) => participant.id === identity.participantId);
     return Boolean(
-      lobby &&
-      (lobby.host.twitchUserId === twitchUserId ||
-        lobby.participants.some((participant) => participant.user.twitchUserId === twitchUserId)),
+      lobby.host.twitchUserId === identity.twitchUserId ||
+        lobby.participants.some(
+          (participant) => participant.user?.twitchUserId === identity.twitchUserId,
+        ),
     );
   }
   async setLobbyStatus(

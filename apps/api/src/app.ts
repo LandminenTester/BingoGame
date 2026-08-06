@@ -16,10 +16,10 @@ import {
 } from './auth.js';
 import { generateApiKey, hashApiKey } from './api-keys.js';
 import { db } from './db.js';
-import { LobbyStore } from './lobby-store.js';
+import { LobbyStore, type LobbyIdentity } from './lobby-store.js';
 import { hashLobbyPassword } from './password.js';
 
-export function buildApp() {
+export async function buildApp() {
   const app = Fastify({ logger: true });
   const store = new LobbyStore();
   const cookieSecret = process.env.SESSION_SECRET ?? 'development-only-session-secret';
@@ -48,17 +48,53 @@ export function buildApp() {
       profileImageUrl: session.user.profileImageUrl ?? undefined,
     };
   };
-  const rooms = new Map<string, Set<{ readyState: number; send: (data: string) => void }>>();
+  const guestCookieName = (lobbyId: string) => `bingo_guest_${lobbyId}`;
+  const resolveLobbyIdentity = async (request: {
+    cookies: Record<string, string | undefined>;
+    unsignCookie: (value: string) => { valid: boolean; value: string | null };
+  }): Promise<LobbyIdentity | null> => {
+    const user = await sessionUser(request);
+    if (user) return { kind: 'twitch', twitchUserId: user.id };
+    return null;
+  };
+  const resolveLobbyIdentityForLobby = async (
+    request: {
+      cookies: Record<string, string | undefined>;
+      unsignCookie: (value: string) => { valid: boolean; value: string | null };
+    },
+    lobbyId: string,
+  ): Promise<LobbyIdentity | null> => {
+    const twitchIdentity = await resolveLobbyIdentity(request);
+    if (twitchIdentity) return twitchIdentity;
+    const signedToken = request.cookies[guestCookieName(lobbyId)];
+    const token = signedToken ? request.unsignCookie(signedToken) : null;
+    if (!token?.valid || !token.value) return null;
+    const participant = await store.resolveGuestSession(lobbyId, token.value);
+    return participant ? { kind: 'guest', participantId: participant.id } : null;
+  };
+  type LobbySocket = {
+    readyState: number;
+    send: (data: string) => void;
+    close: (code?: number, reason?: string) => void;
+    on: (event: 'close', listener: () => void) => void;
+  };
+  const rooms = new Map<string, Set<LobbySocket>>();
   const broadcast = (lobbyId: string, event: unknown) =>
     rooms.get(lobbyId)?.forEach((socket) => {
       if (socket.readyState === 1) socket.send(JSON.stringify(event));
     });
-  void app.register(cors, { origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
-  void app.register(cookie, { secret: cookieSecret });
-  void app.register(websocket);
-  void app.register(helmet, { contentSecurityPolicy: false });
-  void app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
-  void app.register(swagger, {
+  // These must be awaited (not fire-and-forget) - @fastify/websocket relies on its
+  // onRoute hook being attached before any route is declared, which is only
+  // guaranteed once registration has actually completed.
+  await app.register(cors, {
+    origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
+    credentials: true,
+  });
+  await app.register(cookie, { secret: cookieSecret });
+  await app.register(websocket);
+  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(swagger, {
     openapi: {
       info: {
         title: 'Twitch Bingo API',
@@ -68,7 +104,7 @@ export function buildApp() {
       servers: [{ url: '/api/v1' }],
     },
   });
-  void app.register(swaggerUi, { routePrefix: '/documentation' });
+  await app.register(swaggerUi, { routePrefix: '/documentation' });
   app.addHook('onReady', async () => {
     await store.ensurePredefinedTemplates();
   });
@@ -279,6 +315,7 @@ export function buildApp() {
         maxParticipants: z.number().int().min(1).max(1000),
         password: z.string().min(8).max(128).optional(),
         allowLateJoin: z.boolean().optional(),
+        allowGuests: z.boolean().optional(),
       })
       .parse(request.body);
     try {
@@ -314,16 +351,74 @@ export function buildApp() {
     const { lobbyId, fieldId } = z
       .object({ lobbyId: z.string(), fieldId: z.string() })
       .parse(request.params);
-    const user = await sessionUser(request);
-    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const identity = await resolveLobbyIdentityForLobby(request, lobbyId);
+    if (!identity) return reply.code(401).send({ error: 'Authentication required.' });
     const { completed } = z.object({ completed: z.boolean() }).parse(request.body);
     try {
-      const result = await store.markPlayerField(lobbyId, user.id, fieldId, completed);
+      const result = await store.markPlayerField(lobbyId, identity, fieldId, completed);
       broadcast(lobbyId, { type: 'lobby.card_updated', fieldId, completed, result });
       return result;
     } catch (error) {
       return reply.code(403).send({ error: (error as Error).message });
     }
+  });
+  app.post(
+    '/api/lobbies/:code/guest-join',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { code } = z.object({ code: z.string().length(6) }).parse(request.params);
+      const { displayName, password } = z
+        .object({
+          displayName: z.string().min(1).max(40),
+          password: z.string().min(1).max(128).optional(),
+        })
+        .parse(request.body);
+      const lobby = await db.lobby.findUnique({ where: { code: code.toUpperCase() } });
+      if (!lobby) return reply.code(404).send({ error: 'Lobby not found.' });
+      const cookieName = guestCookieName(lobby.id);
+      const existingSigned = request.cookies[cookieName];
+      const existingToken = existingSigned ? request.unsignCookie(existingSigned) : null;
+      try {
+        const { participant, rawToken } = await store.ensureGuestParticipant(
+          code,
+          displayName,
+          password,
+          existingToken?.valid && existingToken.value ? existingToken.value : undefined,
+        );
+        reply.setCookie(cookieName, rawToken, {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: `/api/lobbies/${lobby.id}`,
+          signed: true,
+          maxAge: 60 * 60 * 24 * 30,
+        });
+        return reply.code(201).send({
+          participantId: participant.id,
+          lobbyId: lobby.id,
+          displayName: participant.guestName,
+          card: participant.card,
+        });
+      } catch (error) {
+        const message = (error as Error).message;
+        if (message === 'guests_not_allowed') return reply.code(409).send({ error: message });
+        return reply.code(400).send({ error: message });
+      }
+    },
+  );
+  app.get('/api/lobbies/:lobbyId/guest-session', async (request, reply) => {
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
+    const signed = request.cookies[guestCookieName(lobbyId)];
+    const token = signed ? request.unsignCookie(signed) : null;
+    if (!token?.valid || !token.value) return reply.code(401).send({ error: 'No guest session.' });
+    const participant = await store.resolveGuestSession(lobbyId, token.value);
+    if (!participant) return reply.code(401).send({ error: 'No guest session.' });
+    return {
+      participantId: participant.id,
+      lobbyId,
+      displayName: participant.guestName,
+      card: participant.card,
+    };
   });
   app.post('/api/lobbies/:lobbyId/tasks/:templateFieldId', async (request, reply) => {
     const { lobbyId, templateFieldId } = z
@@ -606,10 +701,10 @@ export function buildApp() {
     }
     return lobby.template.fields;
   });
-  app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket, request) => {
+  app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket: LobbySocket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
-    const user = await sessionUser(request);
-    if (!user || !(await store.canAccessLobby(lobbyId, user.id))) {
+    const identity = await resolveLobbyIdentityForLobby(request, lobbyId);
+    if (!identity || !(await store.canAccessLobby(lobbyId, identity))) {
       socket.close(1008, 'Unauthorized');
       return;
     }

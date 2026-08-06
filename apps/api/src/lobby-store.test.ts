@@ -40,7 +40,7 @@ describe('lobby store', () => {
     expect(lobby.allowLateJoin).toBe(false);
   });
 
-  it('only permits valid lobby lifecycle transitions', async () => {
+  it('starts running immediately and only permits valid lobby lifecycle transitions', async () => {
     const store = new LobbyStore();
     const template = await store.createTemplate({ name: 'Lifecycle', fields });
     const lobby = await store.createLobby({
@@ -51,18 +51,16 @@ describe('lobby store', () => {
       winningCondition: 'first_line',
       maxParticipants: 2,
     });
-    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'running')).rejects.toThrow(
+    expect(lobby.status).toBe('running');
+    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'open')).rejects.toThrow(
       'Cannot transition',
     );
-    await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'open')).resolves.toMatchObject({
-      status: 'open',
-    });
-    await expect(
-      store.setLobbyStatus(lobby.id, 'lifecycle-host', 'running'),
-    ).resolves.toMatchObject({ status: 'running' });
     await expect(store.setLobbyStatus(lobby.id, 'lifecycle-host', 'paused')).resolves.toMatchObject(
       { status: 'paused' },
     );
+    await expect(
+      store.setLobbyStatus(lobby.id, 'lifecycle-host', 'completed'),
+    ).resolves.toMatchObject({ status: 'completed' });
   });
 
   it('rejects a protected lobby without the correct password', async () => {
@@ -121,5 +119,47 @@ describe('lobby store', () => {
     });
     await expect(store.getTemplate(unlisted.id)).resolves.toMatchObject({ id: unlisted.id });
     await expect(store.getTemplate(privateTemplate.id)).rejects.toThrow('Template not found');
+  });
+
+  it('lets a guest join a guest-enabled lobby, mark a field, and rejoin with the same token', async () => {
+    const store = new LobbyStore();
+    const template = await store.createTemplate({ name: 'Guests', fields });
+    const lobby = await store.createLobby({
+      name: 'Guest lobby',
+      templateId: template.id,
+      hostId: 'guest-host',
+      gameMode: 'individual',
+      winningCondition: 'first_line',
+      maxParticipants: 5,
+      allowGuests: true,
+    });
+    const { participant, rawToken } = await store.ensureGuestParticipant(lobby.code, 'Ghosty');
+    expect(participant.guestName).toBe('Ghosty');
+    expect(participant.card?.fields).toHaveLength(25);
+
+    const identity = { kind: 'guest' as const, participantId: participant.id };
+    const fieldId = participant.card!.fields[0].id;
+    await store.markPlayerField(lobby.id, identity, fieldId, true);
+
+    expect(await store.canAccessLobby(lobby.id, identity)).toBe(true);
+
+    const rejoined = await store.ensureGuestParticipant(lobby.code, 'Ghosty', undefined, rawToken);
+    expect(rejoined.participant.id).toBe(participant.id);
+  });
+
+  it('rejects a guest join when the lobby does not allow guests', async () => {
+    const store = new LobbyStore();
+    const template = await store.createTemplate({ name: 'No guests', fields });
+    const lobby = await store.createLobby({
+      name: 'No guest lobby',
+      templateId: template.id,
+      hostId: 'no-guest-host',
+      gameMode: 'individual',
+      winningCondition: 'first_line',
+      maxParticipants: 5,
+    });
+    await expect(store.ensureGuestParticipant(lobby.code, 'Ghosty')).rejects.toThrow(
+      'guests_not_allowed',
+    );
   });
 });

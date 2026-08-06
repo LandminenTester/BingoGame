@@ -108,6 +108,7 @@ model Lobby {
   passwordHash String?
   allowLateJoin Boolean @default(true)
   lateJoinEligible Boolean @default(true)
+  allowGuests Boolean @default(false)
   startedAt DateTime?
   endedAt DateTime?
   createdAt DateTime @default(now())
@@ -117,18 +118,33 @@ model Lobby {
   results BingoResult[]
 }
 
+// A participant either has a userId (Twitch-authenticated) or a guestName +
+// GuestToken (self-chosen name, no account). Enforced in lobby-store.ts, not
+// the DB, since Prisma has no partial-constraint helper without raw SQL.
 model LobbyParticipant {
   id String @id @default(cuid())
   lobbyId String
-  userId String
+  userId String?
+  guestName String? @db.VarChar(60)
   role ParticipantRole @default(player)
   joinedAt DateTime @default(now())
   leftAt DateTime?
   lobby Lobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+  guestToken GuestToken?
   card PlayerCard?
   result BingoResult?
   @@unique([lobbyId, userId])
+}
+
+model GuestToken {
+  id String @id @default(cuid())
+  participantId String @unique
+  participant LobbyParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  @@index([expiresAt])
 }
 
 model PlayerCard {

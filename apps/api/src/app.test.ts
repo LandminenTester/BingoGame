@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
 
-const app = buildApp();
+const app = await buildApp();
 afterAll(() => app.close());
 
 describe('health endpoints', () => {
