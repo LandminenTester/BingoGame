@@ -95,10 +95,12 @@ export function buildApp() {
   });
   app.get('/api/history/hosted/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    const user = sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
     return db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true }, orderBy: { createdAt: 'desc' } });
   });
   app.get('/api/statistics/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    const user = sessionUser(request); if (!user || user.id !== userId) return { error: 'Authentication required.' };
     const lobbies = await db.lobby.findMany({ where: { host: { twitchUserId: userId } }, include: { _count: { select: { participants: true } }, results: true } });
     return { totalSessions: lobbies.length, totalParticipants: lobbies.reduce((total, lobby) => total + lobby._count.participants, 0), completedCards: lobbies.reduce((total, lobby) => total + lobby.results.length, 0) };
   });
@@ -115,23 +117,25 @@ export function buildApp() {
     return { reset: true, deletedLobbyCount: lobbies.length };
   });
   app.post('/api/api-keys', async (request, reply) => {
-    const { userId, name, scopes, expiresAt } = z.object({ userId: z.string(), name: z.string().min(1).max(100), scopes: z.array(z.enum(['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'])).min(1), expiresAt: z.string().datetime().optional() }).parse(request.body);
-    const user = await db.user.findUnique({ where: { twitchUserId: userId } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
+    const session = sessionUser(request); if (!session) return reply.code(401).send({ error: 'Authentication required.' });
+    const { name, scopes, expiresAt } = z.object({ name: z.string().min(1).max(100), scopes: z.array(z.enum(['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'])).min(1), expiresAt: z.string().datetime().optional() }).parse(request.body);
+    const user = await db.user.findUnique({ where: { twitchUserId: session.id } }); if (!user) return reply.code(404).send({ error: 'User not found.' });
     const key = generateApiKey(); const record = await db.apiKey.create({ data: { userId: user.id, name, scopes, keyHash: hashApiKey(key), expiresAt: expiresAt ? new Date(expiresAt) : undefined } });
     return reply.code(201).send({ id: record.id, key, scopes: record.scopes, expiresAt: record.expiresAt });
   });
   app.get('/api/api-keys/:userId', async (request) => {
     const { userId } = z.object({ userId: z.string() }).parse(request.params);
+    const session = sessionUser(request); if (!session || session.id !== userId) return { error: 'Authentication required.' };
     return db.apiKey.findMany({ where: { user: { twitchUserId: userId } }, select: { id: true, name: true, scopes: true, createdAt: true, expiresAt: true, lastUsedAt: true, revokedAt: true } });
   });
   app.post('/api/api-keys/:id/revoke', async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const key = await db.apiKey.findUnique({ where: { id } }); if (!key) return reply.code(404).send({ error: 'API key not found.' });
+    const session = sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
     return db.apiKey.update({ where: { id }, data: { revokedAt: new Date() }, select: { id: true, revokedAt: true } });
   });
   app.post('/api/api-keys/:id/regenerate', async (request, reply) => {
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const key = await db.apiKey.findUnique({ where: { id } }); if (!key) return reply.code(404).send({ error: 'API key not found.' });
+    const session = sessionUser(request); const key = await db.apiKey.findUnique({ where: { id }, include: { user: true } }); if (!key) return reply.code(404).send({ error: 'API key not found.' }); if (!session || key.user.twitchUserId !== session.id) return reply.code(403).send({ error: 'Forbidden.' });
     const rawKey = generateApiKey(); const updated = await db.apiKey.update({ where: { id }, data: { keyHash: hashApiKey(rawKey), revokedAt: null, lastUsedAt: null } });
     return { id: updated.id, key: rawKey, scopes: updated.scopes, expiresAt: updated.expiresAt };
   });
