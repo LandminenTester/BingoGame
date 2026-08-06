@@ -1,11 +1,42 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
 
-enum TemplateVisibility { private public unlisted predefined }
-enum LobbyStatus { draft open running paused completed cancelled }
-enum GameMode { individual streamer_controlled }
-enum WinningCondition { first_line full_card }
-enum ParticipantRole { host player }
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum TemplateVisibility {
+  private
+  public
+  unlisted
+  predefined
+}
+
+enum LobbyStatus {
+  draft
+  open
+  running
+  paused
+  completed
+  cancelled
+}
+
+enum GameMode {
+  individual
+  streamer_controlled
+}
+
+enum WinningCondition {
+  first_line
+  full_card
+}
+
+enum ParticipantRole {
+  host
+  player
+}
 
 model User {
   id String @id @default(cuid())
