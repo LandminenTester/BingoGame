@@ -347,7 +347,7 @@ async function toggleSessionPause() {
         <span class="avatar">{{ currentUser?.displayName.slice(0, 2).toUpperCase() ?? 'PP' }}</span
         ><span
           ><b>{{ currentUser?.displayName ?? 'PixelPanda' }}</b
-          ><small>{{ currentUser ? t('streamerAccount') : 'Twitch login required' }}</small></span
+          ><small>{{ currentUser ? t('streamerAccount') : t('twitchLoginRequired') }}</small></span
         ><button v-if="currentUser" class="more" :aria-label="t('accountOptions')" @click="signOut">
           ↪</button
         ><button v-else class="more" :aria-label="t('accountOptions')" @click="beginTwitchLogin">
@@ -361,7 +361,7 @@ async function toggleSessionPause() {
         <div class="live-chip"><span></span>{{ t('live') }} <b>00:21:09</b></div>
         <div class="top-controls">
           <label class="language-picker"
-            ><span class="sr-only">Language</span
+            ><span class="sr-only">{{ t('language') }}</span
             ><select v-model="locale">
               <option v-for="language in locales" :key="language.code" :value="language.code">
                 {{ language.meta.nativeName }}
@@ -379,12 +379,14 @@ async function toggleSessionPause() {
       </header>
 
       <section v-if="view === 'dashboard' && !activeLobbyId" class="centered-view">
-        <p class="eyebrow">BEREIT ZUM SENDEN</p>
-        <h1>Erstelle deine<br /><em>erste Lobby</em></h1>
-        <p>
-          Lege zuerst eine Vorlage mit 25 Aufgaben an und starte danach deine Twitch-Bingo-Session.
-        </p>
-        <button class="button wide" @click="view = 'templates'">Zu Vorlagen und Lobbys</button>
+        <p class="eyebrow">{{ t('readyToBroadcast') }}</p>
+        <h1>
+          {{ t('createFirstLobby').split('\n')[0] }}<br /><em>{{
+            t('createFirstLobby').split('\n')[1]
+          }}</em>
+        </h1>
+        <p>{{ t('createFirstLobbyCopy') }}</p>
+        <button class="button wide" @click="view = 'templates'">{{ t('goToTemplates') }}</button>
       </section>
 
       <section v-else-if="view === 'dashboard'" class="dashboard">
@@ -402,7 +404,7 @@ async function toggleSessionPause() {
             <button class="button secondary" @click="toggleSessionPause">
               {{
                 activeLobbyStatus === 'open'
-                  ? 'Session starten'
+                  ? t('startSession')
                   : sessionPaused
                     ? t('resume')
                     : t('pause')
