@@ -175,6 +175,11 @@ export function buildApp() {
     try { await readApiKey(request, lobby.host.twitchUserId, 'leaderboard:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
     return store.leaderboard(lobbyId);
   });
+  app.get('/api/v1/lobbies/:lobbyId/tasks', async (request, reply) => {
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params); const lobby = await db.lobby.findUnique({ where: { id: lobbyId }, include: { host: true, template: { include: { fields: { orderBy: { position: 'asc' } } } } } }); if (!lobby) return reply.code(404).send({ error: 'Lobby not found.' });
+    try { await readApiKey(request, lobby.host.twitchUserId, 'lobby:read'); } catch (error) { return reply.code(403).send({ error: (error as Error).message }); }
+    return lobby.template.fields;
+  });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
     const user = sessionUser(request); if (!user || !(await store.canAccessLobby(lobbyId, user.id))) { socket.close(1008, 'Unauthorized'); return; }
