@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: twitch_bingo
       POSTGRES_USER: bingo
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Portainer}
     volumes: [postgres_data:/var/lib/postgresql/data]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U bingo -d twitch_bingo']
@@ -15,9 +15,15 @@ services:
     networks: [internal]
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
-    env_file: .env
     environment:
       DATABASE_URL: postgresql://bingo:${POSTGRES_PASSWORD}@postgres:5432/twitch_bingo?schema=public
+      NODE_ENV: production
+      API_PORT: 3000
+      WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN in Portainer}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:?set TWITCH_CLIENT_ID in Portainer}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:?set TWITCH_CLIENT_SECRET in Portainer}
+      TWITCH_REDIRECT_URI: ${TWITCH_REDIRECT_URI:?set TWITCH_REDIRECT_URI in Portainer}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in Portainer}
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
