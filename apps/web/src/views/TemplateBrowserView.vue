@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Star } from 'lucide-vue-next';
+import { Star } from '@lucide/vue';
 import {
   addApprovedPublisher,
   addFavoriteTemplate,

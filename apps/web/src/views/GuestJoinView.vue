@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft } from 'lucide-vue-next';
+import { ArrowLeft } from '@lucide/vue';
 import { translate, type TranslationKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';

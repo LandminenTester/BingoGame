@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink, RouterView, useRouter } from 'vue-router';
-import { Plus, LayoutGrid, History, Settings } from 'lucide-vue-next';
+import { Plus, LayoutGrid, History, Settings } from '@lucide/vue';
 import { locales, translate, type TranslationKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';

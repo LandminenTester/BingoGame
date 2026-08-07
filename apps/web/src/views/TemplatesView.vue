@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import { useTemplatesStore } from '../stores/templates';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
-import { Pencil, Trash2, X, Plus } from 'lucide-vue-next';
+import { Pencil, Trash2, X, Plus } from '@lucide/vue';
 import BaseInput from '../components/BaseInput.vue';
 import BaseSelect from '../components/BaseSelect.vue';
 import BaseButton from '../components/BaseButton.vue';

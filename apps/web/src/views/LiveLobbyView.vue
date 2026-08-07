@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ExternalLink, Minimize2, Maximize2, Copy, Check, Plus } from 'lucide-vue-next';
+import { ExternalLink, Minimize2, Maximize2, Copy, Check, Plus } from '@lucide/vue';
 import { useLobbyStore } from '../stores/lobby';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';

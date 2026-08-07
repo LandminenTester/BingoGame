@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { Check, Plus } from 'lucide-vue-next';
+import { Check, Plus } from '@lucide/vue';
 import { useLobbyStore } from '../stores/lobby';
 import { useSessionStore } from '../stores/session';
 

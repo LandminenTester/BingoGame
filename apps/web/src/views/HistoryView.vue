@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
-import { LogIn, StopCircle, ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { LogIn, StopCircle, ChevronDown, ChevronUp } from '@lucide/vue';
 import { getHistory, setLobbyStatus, type HistoryLobby } from '../api';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
