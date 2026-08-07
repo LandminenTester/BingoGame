@@ -2036,6 +2036,9 @@ h2 {
 .browser-card {
   cursor: pointer;
 }
+.browser-card-detail-modal {
+  width: min(600px, 100%);
+}
 .browser-card-detail-modal .task-list {
   list-style: none;
   display: flex;

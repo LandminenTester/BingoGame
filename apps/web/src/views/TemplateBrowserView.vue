@@ -253,11 +253,11 @@ async function approvePublisher(loginName: string) {
     </template>
 
     <!-- Template Detail Modal -->
-    <div v-if="selectedTemplate" class="modal-backdrop" @click.self="selectedTemplate = null">
-      <div class="modal browser-card-detail-modal" role="dialog" aria-modal="true">
-        <div class="modal-header">
+    <div v-if="selectedTemplate" class="modal-overlay" role="dialog" aria-modal="true" @click.self="selectedTemplate = null">
+      <div class="modal-card browser-card-detail-modal">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
           <h2>{{ selectedTemplate.name }}</h2>
-          <button type="button" class="icon-button" :aria-label="t('closeModal')" @click="selectedTemplate = null">
+          <button type="button" class="icon-button" style="flex-shrink:0;margin-top:2px;" :aria-label="t('closeModal')" @click="selectedTemplate = null">
             <X :size="18" />
           </button>
         </div>
