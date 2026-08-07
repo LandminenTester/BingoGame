@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { Check, Plus } from 'lucide-vue-next';
 import { useLobbyStore } from '../stores/lobby';
 import { useSessionStore } from '../stores/session';
 
@@ -60,7 +61,7 @@ function onTileClick(index: number) {
       >
         <span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span>
         <span>{{ task }}</span>
-        <i>{{ lobby.marked.has(index) ? '✓' : '+' }}</i>
+        <i><component :is="lobby.marked.has(index) ? Check : Plus" :size="14" /></i>
       </button>
     </div>
   </div>

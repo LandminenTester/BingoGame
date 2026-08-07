@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { ExternalLink, Minimize2, Maximize2, Copy, Check, Plus } from 'lucide-vue-next';
 import { useLobbyStore } from '../stores/lobby';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
@@ -130,7 +131,7 @@ function confirmIndividualToggle() {
       <button class="code-toggle" type="button" @click="codeRevealed = !codeRevealed">
         {{ t('code') }} <strong>{{ codeRevealed ? lobby.code : '••••••' }}</strong>
       </button>
-      <button type="button" @click="copyCode">{{ copied ? t('copied') : t('copy') }}</button>
+      <button type="button" @click="copyCode"><Copy :size="12" /> {{ copied ? t('copied') : t('copy') }}</button>
     </div>
     <div class="board-layout">
       <section class="board-section">
@@ -139,9 +140,10 @@ function confirmIndividualToggle() {
           <div class="section-label-controls">
             <BaseCheckbox v-model="confirmBeforeMarking" :label="t('confirmTiles')" />
             <button type="button" class="board-size-btn" @click="toggleBoardScale">
-              {{ boardScale === 'compact' ? '⊞' : '⊟' }} {{ boardScale === 'compact' ? 'Normal' : 'Kompakt' }}
+              <component :is="boardScale === 'compact' ? Maximize2 : Minimize2" :size="12" />
+              {{ boardScale === 'compact' ? 'Normal' : 'Kompakt' }}
             </button>
-            <button type="button" class="popout-btn" @click="openPopout">⤢ Popout</button>
+            <button type="button" class="popout-btn" @click="openPopout"><ExternalLink :size="12" /> Popout</button>
             <b>{{ lobby.completion }}/25 {{ t('completed') }}</b>
           </div>
         </div>
@@ -157,7 +159,7 @@ function confirmIndividualToggle() {
           >
             <span class="tile-index">{{ String(index + 1).padStart(2, '0') }}</span
             ><span>{{ task }}</span
-            ><i>{{ lobby.marked.has(index) ? '✓' : '+' }}</i>
+            ><i><component :is="lobby.marked.has(index) ? Check : Plus" :size="14" /></i>
           </button>
         </div>
       </section>

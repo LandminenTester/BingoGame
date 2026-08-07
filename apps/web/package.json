@@ -1,21 +1,22 @@
 {
-  "name": "@twitch-bingo/web",
+  "name": "@bingo-buddy/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @twitch-bingo/contracts build",
-    "prebuild": "pnpm --filter @twitch-bingo/contracts build",
-    "prelint": "pnpm --filter @twitch-bingo/contracts build",
+    "predev": "pnpm --filter @bingo-buddy/contracts build",
+    "prebuild": "pnpm --filter @bingo-buddy/contracts build",
+    "prelint": "pnpm --filter @bingo-buddy/contracts build",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "lint": "vue-tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@twitch-bingo/contracts": "workspace:*",
+    "@bingo-buddy/contracts": "workspace:*",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vueuse/core": "^13.7.0",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.3",
     "tailwindcss": "^4.1.12",
     "vite": "^7.1.3",

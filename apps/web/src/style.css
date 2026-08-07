@@ -13,6 +13,13 @@
   --accent-soft: #d3bbff;
   --lime: #b7ed6c;
   --glow: rgba(126, 77, 235, 0.2);
+  /* Responsive font scale */
+  --fs-2xs: clamp(7px,  0.55vw,  9px);
+  --fs-xs:  clamp(8px,  0.7vw,  10px);
+  --fs-sm:  clamp(9px,  0.85vw, 11px);
+  --fs-md:  clamp(11px, 0.95vw, 13px);
+  --fs-lg:  clamp(13px, 1.1vw,  15px);
+  --fs-xl:  clamp(17px, 1.7vw,  21px);
 }
 :root[data-theme='light'] {
   color-scheme: light;
@@ -71,7 +78,7 @@ select:focus-visible {
 .brand {
   font-family: 'Barlow Condensed', sans-serif;
   letter-spacing: 0.09em;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   line-height: 0.82;
   display: flex;
   gap: 11px;
@@ -103,7 +110,7 @@ nav button {
   text-align: left;
   padding: 12px;
   border-radius: 7px;
-  font-size: 13px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   display: flex;
   gap: 11px;
@@ -128,7 +135,7 @@ nav button.active .nav-dot {
 .ranking small {
   display: block;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   margin-top: 2px;
 }
 .avatar {
@@ -138,7 +145,7 @@ nav button.active .nav-dot {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   color: #20142b;
 }
@@ -157,7 +164,7 @@ nav button.active .nav-dot {
 }
 .live-chip {
   font:
-    11px 'DM Mono',
+    var(--fs-sm) 'DM Mono',
     monospace;
   color: var(--muted);
   letter-spacing: 0.07em;
@@ -227,7 +234,7 @@ h2 {
 .eyebrow {
   color: var(--accent-soft);
   font:
-    500 10px 'DM Mono',
+    500 var(--fs-xs) 'DM Mono',
     monospace;
   letter-spacing: 0.1em;
   margin-bottom: 10px;
@@ -236,7 +243,7 @@ h2 {
 .centered-view > p {
   color: var(--muted);
   margin-top: 15px;
-  font-size: 14px;
+  font-size: var(--fs-lg);
 }
 .session-actions {
   display: flex;
@@ -248,7 +255,7 @@ h2 {
   background: var(--accent);
   color: white;
   padding: 11px 15px;
-  font-size: 12px;
+  font-size: var(--fs-md);
   font-weight: 800;
 }
 .button:hover {
@@ -272,13 +279,13 @@ h2 {
   gap: 12px;
   padding: 9px 14px;
   font:
-    11px 'DM Mono',
+    var(--fs-sm) 'DM Mono',
     monospace;
   color: var(--muted);
 }
 .signal-strip b {
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 .signal-strip button {
   margin-left: auto;
@@ -306,14 +313,14 @@ h2 {
 }
 .section-label span {
   font:
-    500 10px 'DM Mono',
+    500 var(--fs-xs) 'DM Mono',
     monospace;
   letter-spacing: 0.1em;
   color: var(--muted);
 }
 .section-label b {
   font:
-    600 11px 'DM Mono',
+    600 var(--fs-sm) 'DM Mono',
     monospace;
   color: var(--accent-soft);
 }
@@ -357,7 +364,7 @@ h2 {
   top: 7px;
   left: 8px;
   font:
-    9px 'DM Mono',
+    var(--fs-2xs) 'DM Mono',
     monospace;
   opacity: 0.65;
 }
@@ -365,7 +372,7 @@ h2 {
   position: absolute;
   right: 8px;
   bottom: 7px;
-  font: 700 18px 'Barlow Condensed';
+  font: 700 var(--fs-xl) 'Barlow Condensed';
   font-style: normal;
   opacity: 0.65;
 }
@@ -390,12 +397,12 @@ h2 {
   border: 1px solid var(--line);
   color: var(--text);
   padding: 10px;
-  font-size: 12px;
+  font-size: var(--fs-md);
 }
 .control-panel small {
   display: block;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   line-height: 1.5;
   margin-top: 10px;
 }
@@ -411,7 +418,7 @@ h2 {
   align-items: center;
   padding: 10px 0;
   border-top: 1px solid var(--line);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .ranking li > b {
   font-family: 'DM Mono';
@@ -423,10 +430,10 @@ h2 {
 .mini {
   width: 25px;
   height: 25px;
-  font-size: 8px;
+  font-size: var(--fs-2xs);
 }
 .ranking strong {
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   color: var(--muted);
 }
 .centered-view,
@@ -451,7 +458,7 @@ h2 {
 .join-form label {
   display: grid;
   gap: 8px;
-  font: 11px 'DM Mono';
+  font: var(--fs-sm) 'DM Mono';
   color: var(--muted);
 }
 .join-form input {
@@ -467,11 +474,11 @@ h2 {
 .error {
   margin-top: 8px !important;
   color: #ff8890 !important;
-  font-size: 12px !important;
+  font-size: var(--fs-md) !important;
 }
 .centered-view small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .placeholder-view > p:not(.eyebrow) {
   color: var(--muted);
@@ -511,7 +518,7 @@ h2 {
 .lobby-form label {
   display: grid;
   gap: 6px;
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   color: var(--muted);
 }
 .builder-form input,
@@ -550,7 +557,7 @@ h2 {
 }
 .management-list small {
   color: var(--muted);
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
 }
 .stat-grid {
   display: grid;
@@ -570,7 +577,7 @@ h2 {
 }
 .stat-grid span {
   color: var(--muted);
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
 }
 .api-key-form {
   display: flex;
@@ -582,7 +589,7 @@ h2 {
   display: grid;
   gap: 6px;
   flex: 1;
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   color: var(--muted);
 }
 .api-key-form input {
@@ -596,7 +603,7 @@ h2 {
   padding: 12px;
   background: color-mix(in srgb, var(--accent) 15%, var(--surface));
   color: var(--accent-soft) !important;
-  font: 11px 'DM Mono';
+  font: var(--fs-sm) 'DM Mono';
 }
 .sr-only {
   position: absolute;
@@ -624,7 +631,7 @@ h2 {
 .base-field {
   display: grid;
   gap: 6px;
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   color: var(--muted);
 }
 .base-field-label {
@@ -638,7 +645,7 @@ h2 {
   color: var(--text);
   padding: 10px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--fs-lg);
 }
 .base-select {
   appearance: none;
@@ -648,7 +655,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: var(--fs-md);
   color: var(--text);
   cursor: pointer;
   user-select: none;
@@ -708,7 +715,7 @@ h2 {
   color: var(--text);
   padding: 9px 11px;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   border-radius: 4px;
 }
 .task-card:hover:not(:disabled) {
@@ -736,11 +743,11 @@ h2 {
   align-items: center;
   padding: 8px 0;
   border-top: 1px solid var(--line);
-  font-size: 12px;
+  font-size: var(--fs-md);
 }
 .member-list small {
   color: var(--muted);
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
 }
 .subtabs {
   display: flex;
@@ -752,7 +759,7 @@ h2 {
   color: var(--muted);
   text-decoration: none;
   padding: 10px 2px;
-  font: 700 12px 'Barlow Condensed', sans-serif;
+  font: 700 var(--fs-md) 'Barlow Condensed', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid transparent;
@@ -820,7 +827,7 @@ h2 {
 }
 .modal-card p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-lg);
   line-height: 1.5;
 }
 .modal-actions {
@@ -846,7 +853,7 @@ h2 {
 }
 .listbox-trigger-caret {
   opacity: 0.65;
-  font-size: 10px;
+  font-size: var(--fs-xs);
 }
 .listbox-panel {
   position: absolute;
@@ -870,7 +877,7 @@ h2 {
   background: transparent;
   border: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-lg);
 }
 .listbox-option:hover,
 .listbox-option.active {
@@ -896,7 +903,7 @@ h2 {
 .task-pool-index {
   width: 22px;
   flex-shrink: 0;
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   color: var(--muted);
   text-align: right;
 }
@@ -929,7 +936,10 @@ h2 {
   color: var(--muted);
   padding: 6px 10px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .icon-button:hover {
   color: var(--text);
@@ -941,7 +951,7 @@ h2 {
 }
 .hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   margin-top: 6px;
   line-height: 1.5;
 }
@@ -1000,7 +1010,7 @@ h2 {
   margin-top: 4px;
 }
 .scope-badge {
-  font: 9px 'DM Mono';
+  font: var(--fs-2xs) 'DM Mono';
   color: var(--accent-soft);
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -1020,7 +1030,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: var(--fs-md);
   padding: 9px;
   border-radius: 8px;
   color: var(--text);
@@ -1049,7 +1059,7 @@ h2 {
   color: var(--text);
   padding: 9px 10px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-md);
 }
 .account-menu button:hover {
   background: var(--surface-2);
@@ -1058,7 +1068,7 @@ h2 {
   padding: 9px;
   display: grid;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   line-height: 1.4;
 }
@@ -1072,7 +1082,7 @@ h2 {
 }
 .legal-links a {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   text-decoration: none;
 }
 .legal-links a:hover {
@@ -1131,7 +1141,7 @@ h2 {
 .cookie-banner p {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-md);
   max-width: 720px;
 }
 .browser-toolbar {
@@ -1195,7 +1205,7 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-md);
   border-top: 1px solid var(--line);
   padding-top: 6px;
 }
@@ -1203,7 +1213,7 @@ h2 {
 .visibility-badge {
   display: inline-flex;
   align-items: center;
-  font: 700 8px 'DM Mono', monospace;
+  font: 700 var(--fs-2xs) 'DM Mono', monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border-radius: 3px;
@@ -1346,7 +1356,7 @@ h2 {
   border: 1px solid var(--line);
 }
 .browser-card-author {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: auto;
 }
@@ -1387,7 +1397,7 @@ h2 {
   gap: 12px;
 }
 .section-label-controls .base-checkbox {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 .section-label-controls .base-checkbox .base-checkbox__label {
@@ -1399,7 +1409,10 @@ h2 {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font: 10px 'DM Mono', monospace;
+  font: var(--fs-xs) 'DM Mono', monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 8px;
   border-radius: 3px;
   letter-spacing: 0.05em;
@@ -1412,12 +1425,12 @@ h2 {
 
 /* ── Compact board ─────────────────────────── */
 .bingo-board--compact .tile {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   min-height: 56px;
   padding: 18px 4px 6px;
 }
 .bingo-board--compact .tile-index {
-  font-size: 7px;
+  font-size: var(--fs-2xs);
 }
 
 /* ── Board size toggle button ──────────────── */
@@ -1425,7 +1438,10 @@ h2 {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font: 10px 'DM Mono', monospace;
+  font: var(--fs-xs) 'DM Mono', monospace;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 8px;
   border-radius: 3px;
   letter-spacing: 0.05em;
@@ -1462,7 +1478,7 @@ h2 {
   margin: 0;
 }
 .history-status {
-  font: 9px 'DM Mono';
+  font: var(--fs-2xs) 'DM Mono';
   padding: 3px 9px;
   border-radius: 20px;
   white-space: nowrap;
@@ -1483,7 +1499,7 @@ h2 {
   padding: 0 16px 10px;
 }
 .history-chip {
-  font: 10px 'DM Mono';
+  font: var(--fs-xs) 'DM Mono';
   padding: 3px 9px;
   border-radius: 20px;
   border: 1px solid var(--line);
@@ -1504,7 +1520,10 @@ h2 {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font: 11px 'DM Mono';
+  font: var(--fs-sm) 'DM Mono';
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
   padding: 0;
   letter-spacing: 0.03em;
@@ -1521,7 +1540,7 @@ h2 {
   grid-template-columns: 28px 1fr 1fr;
   gap: 8px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 .progress-bar-track {
   height: 4px;
@@ -1544,7 +1563,7 @@ h2 {
   flex-wrap: wrap;
 }
 .api-key-tag {
-  font: 9px 'DM Mono';
+  font: var(--fs-2xs) 'DM Mono';
   padding: 3px 8px;
   border-radius: 20px;
   white-space: nowrap;
@@ -1562,7 +1581,7 @@ h2 {
   margin-bottom: 20px;
 }
 .template-editor-copy {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   color: var(--muted);
   line-height: 1.5;
   flex: 1;
@@ -1579,14 +1598,14 @@ h2 {
   gap: 3px;
 }
 .browser-card-tasks li {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .browser-card-more {
-  font: 9px 'DM Mono';
+  font: var(--fs-2xs) 'DM Mono';
   color: var(--accent-soft);
 }
 
@@ -1611,8 +1630,8 @@ h2 {
   flex-direction: column;
   gap: 3px;
 }
-.pending-card-name { font-size: 13px; font-weight: 600; }
-.pending-card-author { font: 10px 'DM Mono'; color: var(--muted); }
+.pending-card-name { font-size: var(--fs-lg); font-weight: 600; }
+.pending-card-author { font: var(--fs-xs) 'DM Mono'; color: var(--muted); }
 
 @media (prefers-reduced-motion: no-preference) {
   .pulse {
@@ -1699,7 +1718,7 @@ h2 {
     height: 64px;
   }
   .live-chip {
-    font-size: 9px;
+    font-size: var(--fs-2xs);
   }
   .session-heading {
     align-items: start;
@@ -1724,17 +1743,16 @@ h2 {
   }
   .tile {
     padding: 12px 7px 6px;
-    font-size: 10px;
+    font-size: var(--fs-xs);
   }
   .tile-index {
     top: 4px;
     left: 5px;
-    font-size: 7px;
+    font-size: var(--fs-2xs);
   }
   .tile i {
     right: 5px;
     bottom: 3px;
-    font-size: 14px;
   }
   .right-rail {
     grid-template-columns: 1fr;
@@ -1751,4 +1769,48 @@ h2 {
   .placeholder-view h1 {
     font-size: 46px;
   }
+}
+
+/* Creator credit in sidebar footer */
+.creator-credit {
+  padding: 8px 10px;
+  font: var(--fs-2xs) 'DM Mono', monospace;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.creator-credit a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.creator-credit a:hover { color: var(--text); }
+
+/* Back button in GuestJoinView */
+.back-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: var(--fs-sm) 'DM Mono', monospace;
+  padding: 0 0 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.back-btn:hover { color: var(--text); }
+
+/* Lucide icon in nav buttons */
+.nav-icon {
+  flex-shrink: 0;
+}
+
+/* HistoryView participant info (replaces inline styles) */
+.history-participant-name {
+  font-size: var(--fs-md);
+}
+.history-participant-score {
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
 }

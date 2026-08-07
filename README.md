@@ -1,4 +1,4 @@
-# Twitch Bingo
+# BingoBuddy
 
 An interactive, self-hosted Bingo companion for Twitch streamers and their communities. It provides Twitch authentication, persistent PostgreSQL game state, 25-field templates, password-protected lobbies, real-time cards and rankings, a scoped external API, and German-first localization.
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
+import { LogIn, StopCircle, ChevronDown, ChevronUp } from 'lucide-vue-next';
 import { getHistory, setLobbyStatus, type HistoryLobby } from '../api';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
@@ -98,7 +99,7 @@ async function confirmEnd() {
               :to="{ name: 'app-lobby', params: { lobbyId: entry.id } }"
               class="button"
             >
-              {{ t('rejoinSession') }}
+              <LogIn :size="14" /> {{ t('rejoinSession') }}
             </RouterLink>
             <button
               v-if="ACTIVE_STATUSES.has(entry.status)"
@@ -106,11 +107,11 @@ async function confirmEnd() {
               type="button"
               @click="requestEnd(entry)"
             >
-              {{ t('endSessionAction') }}
+              <StopCircle :size="14" /> {{ t('endSessionAction') }}
             </button>
             <button class="history-participants-toggle" type="button" @click="toggleExpanded(entry.id)">
               {{ t('participantsToggle') }} ({{ entry.participants.length }})
-              {{ expanded.has(entry.id) ? '▲' : '▼' }}
+              <component :is="expanded.has(entry.id) ? ChevronUp : ChevronDown" :size="12" />
             </button>
           </div>
           <div v-if="expanded.has(entry.id)" class="history-participants">
@@ -120,7 +121,7 @@ async function confirmEnd() {
               class="history-participant"
             >
               <span class="avatar mini">{{ participant.displayName.slice(0, 2).toUpperCase() }}</span>
-              <span style="font-size:12px;">{{ participant.displayName }}</span>
+              <span class="history-participant-name">{{ participant.displayName }}</span>
               <div>
                 <div class="progress-bar-track">
                   <div
@@ -128,7 +129,7 @@ async function confirmEnd() {
                     :style="{ width: participant.totalFields > 0 ? `${(participant.completedFields / participant.totalFields) * 100}%` : '0%' }"
                   ></div>
                 </div>
-                <span style="font-size:9px;color:var(--muted);font-family:'DM Mono';">
+                <span class="history-participant-score">
                   {{ participant.completedFields }}/{{ participant.totalFields }}
                 </span>
               </div>

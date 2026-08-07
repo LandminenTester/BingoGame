@@ -20,6 +20,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@bingo-buddy/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@fastify/cookie':
         specifier: ^11.1.2
         version: 11.1.2
@@ -44,9 +47,6 @@ importers:
       '@prisma/client':
         specifier: ^6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
-      '@twitch-bingo/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       argon2:
         specifier: ^0.45.1
         version: 0.45.1
@@ -78,7 +78,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@twitch-bingo/contracts':
+      '@bingo-buddy/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@vitejs/plugin-vue':
@@ -87,6 +87,9 @@ importers:
       '@vueuse/core':
         specifier: ^13.7.0
         version: 13.9.0(vue@3.5.41(typescript@5.9.3))
+      lucide-vue-next:
+        specifier: ^1.0.0
+        version: 1.0.0(vue@3.5.41(typescript@5.9.3))
       pinia:
         specifier: ^3.0.3
         version: 3.0.4(typescript@5.9.3)(vue@3.5.41(typescript@5.9.3))
@@ -977,6 +980,12 @@ packages:
   lru-cache@11.5.2:
     resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
     engines: {node: 20 || >=22}
+
+  lucide-vue-next@1.0.0:
+    resolution: {integrity: sha512-V6SPvx1IHTj/UY+FrIYWV5faISsPSb8BnWSFDxAtezWKvWc9ZZ40PDrdu1/Qb5vg4lHWr1hs1BAMGVGm6V1Xdg==}
+    deprecated: Package deprecated. Please use @lucide/vue instead.
+    peerDependencies:
+      vue: '>=3.0.1'
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -2235,6 +2244,10 @@ snapshots:
   loupe@3.2.1: {}
 
   lru-cache@11.5.2: {}
+
+  lucide-vue-next@1.0.0(vue@3.5.41(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.41(typescript@5.9.3)
 
   magic-string@0.30.21:
     dependencies:

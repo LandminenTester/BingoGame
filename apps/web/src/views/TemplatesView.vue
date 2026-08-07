@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useTemplatesStore } from '../stores/templates';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
+import { Pencil, Trash2, X, Plus } from 'lucide-vue-next';
 import BaseInput from '../components/BaseInput.vue';
 import BaseSelect from '../components/BaseSelect.vue';
 import BaseButton from '../components/BaseButton.vue';
@@ -99,7 +100,10 @@ async function confirmDelete() {
     await templates.remove(template.id);
     if (wasSelected) resetForm();
   } catch (err) {
-    error.value = (err as Error).message;
+    const msg = (err as Error).message;
+    error.value = msg.includes('not found') || msg.includes('forbidden')
+      ? t('errorCannotDeleteTemplate')
+      : msg;
   }
 }
 </script>
@@ -131,8 +135,8 @@ async function confirmDelete() {
             <span class="template-item-name">{{ template.name }}</span>
             <span :class="['visibility-badge', template.visibility]">{{ visibilityLabel(template.visibility) }}</span>
             <span class="template-item-actions">
-              <button class="tpl-btn" type="button" :title="t('edit')" @click.stop="loadTemplate(template)">✎</button>
-              <button class="tpl-btn tpl-btn--danger" type="button" :title="t('delete')" @click.stop="requestDelete(template)">✕</button>
+              <button class="tpl-btn" type="button" :title="t('edit')" @click.stop="loadTemplate(template)"><Pencil :size="14" /></button>
+              <button v-if="template.visibility !== 'predefined'" class="tpl-btn tpl-btn--danger" type="button" :title="t('delete')" @click.stop="requestDelete(template)"><Trash2 :size="14" /></button>
             </span>
           </article>
           <p v-if="!templates.items.length" class="muted">{{ t('noTemplates') }}</p>
@@ -165,7 +169,7 @@ async function confirmDelete() {
                 :aria-label="t('removeTaskRow')"
                 @click="removeTaskRow(index)"
               >
-                ×
+                <X :size="12" />
               </button>
             </div>
           </div>
@@ -175,7 +179,7 @@ async function confirmDelete() {
             class="icon-button"
             @click="addTaskRow"
           >
-            + {{ t('addTaskRow') }}
+            <Plus :size="12" /> {{ t('addTaskRow') }}
           </button>
           <p class="hint">{{ t('taskPoolHint') }}</p>
         </form>

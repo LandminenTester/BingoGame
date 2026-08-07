@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { ArrowLeft } from 'lucide-vue-next';
 import { translate, type TranslationKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
@@ -53,6 +54,9 @@ async function submit() {
 
 <template>
   <section class="centered-view">
+    <button v-if="session.status !== 'anonymous'" class="back-btn" type="button" @click="router.back()">
+      <ArrowLeft :size="15" /> Zurück
+    </button>
     <p class="eyebrow">{{ t('viewerAccess') }}</p>
     <h1>
       {{ t('joinTitle').split('\n')[0] }}<br /><em>{{ t('joinTitle').split('\n')[1] }}</em>

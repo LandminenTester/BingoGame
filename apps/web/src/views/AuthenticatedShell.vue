@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink, RouterView, useRouter } from 'vue-router';
+import { Plus, LayoutGrid, History, Settings } from 'lucide-vue-next';
 import { locales, translate, type TranslationKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
@@ -11,11 +12,12 @@ const ui = useUiStore();
 const router = useRouter();
 const t = (key: TranslationKey) => translate(ui.locale, key);
 
-const nav: { name: string; label: TranslationKey }[] = [
-  { name: 'create-lobby', label: 'createLobby' },
-  { name: 'templates', label: 'templates' },
-  { name: 'history', label: 'history' },
-  { name: 'settings', label: 'settings' },
+type NavItem = { name: string; label: TranslationKey; icon: typeof Plus };
+const nav: NavItem[] = [
+  { name: 'create-lobby', label: 'createLobby', icon: Plus },
+  { name: 'templates', label: 'templates', icon: LayoutGrid },
+  { name: 'history', label: 'history', icon: History },
+  { name: 'settings', label: 'settings', icon: Settings },
 ];
 
 const accountMenuOpen = ref(false);
@@ -41,7 +43,7 @@ async function signOut() {
 <template>
   <main class="app-shell">
     <aside class="sidebar" aria-label="Main navigation">
-      <div class="brand"><span class="brand-mark">S</span><span>SIGNAL<br /><b>BINGO</b></span></div>
+      <div class="brand"><span class="brand-mark">B</span><span>BINGO<br /><b>BUDDY</b></span></div>
       <div ref="accountRoot" class="account-panel">
         <button
           v-if="session.twitchUser"
@@ -78,13 +80,18 @@ async function signOut() {
           custom
         >
           <button :class="{ active: isActive }" @click="navigate">
-            <span class="nav-dot"></span>{{ t(item.label) }}
+            <component :is="item.icon" :size="15" class="nav-icon" />{{ t(item.label) }}
           </button>
         </RouterLink>
       </nav>
       <div class="legal-links">
         <RouterLink :to="{ name: 'imprint' }">{{ t('imprint') }}</RouterLink>
         <RouterLink :to="{ name: 'privacy' }">{{ t('privacyPolicy') }}</RouterLink>
+      </div>
+      <div class="creator-credit">
+        <span>von</span>
+        <a href="https://github.com/LandminenTester/BingoBuddy" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://twitch.tv/landminentester" target="_blank" rel="noopener">Twitch</a>
       </div>
     </aside>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { Star } from 'lucide-vue-next';
 import {
   addApprovedPublisher,
   addFavoriteTemplate,
@@ -131,7 +132,7 @@ async function approvePublisher(loginName: string) {
             :aria-label="favoriteIds.has(template.id) ? t('unfavorite') : t('favorite')"
             @click="toggleFavorite(template)"
           >
-            {{ favoriteIds.has(template.id) ? '★' : '☆' }}
+            <Star :size="15" :fill="favoriteIds.has(template.id) ? 'currentColor' : 'none'" />
           </button>
           <p class="browser-card-title">{{ template.name }}</p>
           <div class="browser-card-meta">

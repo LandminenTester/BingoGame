@@ -1,13 +1,13 @@
 {
-  "name": "twitch-bingo",
+  "name": "bingo-buddy",
   "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-only",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "build": "pnpm --filter @twitch-bingo/contracts build && pnpm --filter @twitch-bingo/api build && pnpm --filter @twitch-bingo/web build",
-    "dev": "pnpm --parallel --filter @twitch-bingo/api --filter @twitch-bingo/web dev",
-    "lint": "pnpm --parallel --filter @twitch-bingo/api --filter @twitch-bingo/web lint",
+    "build": "pnpm --filter @bingo-buddy/contracts build && pnpm --filter @bingo-buddy/api build && pnpm --filter @bingo-buddy/web build",
+    "dev": "pnpm --parallel --filter @bingo-buddy/api --filter @bingo-buddy/web dev",
+    "lint": "pnpm --parallel --filter @bingo-buddy/api --filter @bingo-buddy/web lint",
     "test": "pnpm --recursive test",
     "format": "prettier --write ."
   },

@@ -102,9 +102,9 @@ export async function buildApp() {
   await app.register(swagger, {
     openapi: {
       info: {
-        title: 'Twitch Bingo API',
+        title: 'BingoBuddy API',
         version: 'v1',
-        description: 'Read API for Twitch Bingo integrations.',
+        description: 'Read API for BingoBuddy integrations.',
       },
       servers: [{ url: '/api/v1' }],
     },
@@ -124,7 +124,7 @@ export async function buildApp() {
     clearInterval(cleanupInterval);
   });
 
-  app.get('/health', async () => ({ status: 'ok', service: 'twitch-bingo-api' }));
+  app.get('/health', async () => ({ status: 'ok', service: 'bingo-buddy-api' }));
   app.get('/ready', async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;

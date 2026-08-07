@@ -4,7 +4,7 @@ import {
   shuffleCard,
   type GameMode,
   type WinningCondition,
-} from '@twitch-bingo/contracts';
+} from '@bingo-buddy/contracts';
 import { createSessionId, hashSessionId } from './auth.js';
 import { db } from './db.js';
 import { verifyLobbyPassword } from './password.js';
