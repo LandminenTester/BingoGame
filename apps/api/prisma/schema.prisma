@@ -53,6 +53,7 @@ model User {
   auditEvents AuditEvent[]
   sessions UserSession[]
   favoriteTemplates TemplateFavorite[]
+  templateVotes TemplateVote[]
 }
 
 model UserSession {
@@ -83,6 +84,7 @@ model BingoTemplate {
   fields BingoTemplateField[]
   lobbies Lobby[]
   favoritedBy TemplateFavorite[]
+  votes TemplateVote[]
 }
 
 model TemplateFavorite {
@@ -136,6 +138,7 @@ model Lobby {
   participants LobbyParticipant[]
   events LobbyEvent[]
   results BingoResult[]
+  rounds LobbyRound[]
 }
 
 // A participant either has a userId (Twitch-authenticated) or a guestName +
@@ -223,6 +226,26 @@ model ApiKey {
   revokedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TemplateVote {
+  id         String        @id @default(cuid())
+  templateId String
+  userId     String
+  value      Int
+  createdAt  DateTime      @default(now())
+  template   BingoTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([templateId, userId])
+}
+
+model LobbyRound {
+  id          String   @id @default(cuid())
+  lobbyId     String
+  roundNumber Int
+  snapshot    Json
+  createdAt   DateTime @default(now())
+  lobby       Lobby    @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
 }
 
 model AuditEvent {

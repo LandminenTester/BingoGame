@@ -58,6 +58,9 @@ export type LobbyEvent =
   | { type: 'lobby.player_joined'; lobbyId: string; participant: Participant }
   | { type: 'lobby.task_changed'; lobbyId: string; fieldId: string; completed: boolean }
   | { type: 'lobby.ranking_updated'; lobbyId: string; results: RankingResult[] }
-  | { type: 'lobby.snapshot'; lobby: LobbySummary };
+  | { type: 'lobby.snapshot'; lobby: LobbySummary }
+  | { type: 'lobby.restarted'; roundNumber: number }
+  | { type: 'lobby.status_updated'; status: LobbyStatus }
+  | { type: 'lobby.members_updated'; members: Array<{ participantId: string; displayName: string; role: ParticipantRole; joinedAt: string | Date }> };
 
 export * from './game.js';

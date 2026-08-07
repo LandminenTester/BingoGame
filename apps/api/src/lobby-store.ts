@@ -29,6 +29,7 @@ export interface TemplateInput {
   fields: string[];
   visibility?: 'private' | 'public' | 'unlisted';
   authorId?: string;
+  game?: string;
 }
 export interface LobbyInput {
   name: string;
@@ -58,27 +59,6 @@ async function ensureUser(id: string) {
 }
 
 export class LobbyStore {
-  async ensurePredefinedTemplates() {
-    const name = 'Stream Classic';
-    const existing = await db.bingoTemplate.findFirst({
-      where: { name, visibility: 'predefined', authorId: null },
-    });
-    if (existing) return existing;
-    return db.bingoTemplate.create({
-      data: {
-        name,
-        visibility: 'predefined',
-        tags: ['stream', 'classic'],
-        language: 'de',
-        fields: {
-          create: Array.from({ length: 25 }, (_, position) => ({
-            position,
-            label: `Stream-Moment ${position + 1}`,
-          })),
-        },
-      },
-    });
-  }
   /** landminentester is a permanent super-publisher; anyone else needs an ApprovedPublisher row. */
   async canPublishPublicly(loginName: string) {
     if (loginName === SUPER_PUBLISHER_LOGIN) return true;
@@ -115,10 +95,11 @@ export class LobbyStore {
         name: input.name,
         visibility: input.visibility ?? 'private',
         authorId: author?.id,
+        game: input.game ?? null,
         fields: { create: input.fields.map((label, position) => ({ label, position })) },
         tags: [],
       },
-      include: { fields: { orderBy: { position: 'asc' } } },
+      include: { fields: { orderBy: { position: 'asc' } }, author: true },
     });
   }
   listTemplates(twitchUserId?: string) {
@@ -134,8 +115,9 @@ export class LobbyStore {
     });
   }
   /** All non-deleted public templates across every author, for the public browser. */
-  listPublicTemplates(search?: string) {
-    return db.bingoTemplate.findMany({
+  async listPublicTemplates(search?: string, twitchUserId?: string) {
+    const user = twitchUserId ? await db.user.findUnique({ where: { twitchUserId } }) : null;
+    const templates = await db.bingoTemplate.findMany({
       where: {
         deletedAt: null,
         visibility: 'public',
@@ -150,9 +132,26 @@ export class LobbyStore {
             }
           : {}),
       },
-      include: { fields: { orderBy: { position: 'asc' } }, author: true },
+      include: {
+        fields: { orderBy: { position: 'asc' } },
+        author: true,
+        votes: user ? { where: { userId: user.id } } : false,
+        _count: { select: { votes: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+    const withVoteScores = await Promise.all(
+      templates.map(async (template) => {
+        const upvotes = await db.templateVote.count({ where: { templateId: template.id, value: 1 } });
+        const downvotes = await db.templateVote.count({ where: { templateId: template.id, value: -1 } });
+        const myVote = user
+          ? (await db.templateVote.findUnique({ where: { templateId_userId: { templateId: template.id, userId: user.id } } }))?.value ?? null
+          : null;
+        const { votes: _votes, _count: _count, ...rest } = template;
+        return { ...rest, upvotes, downvotes, myVote };
+      }),
+    );
+    return withVoteScores.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
   }
   async getTemplate(id: string, twitchUserId?: string) {
     const template = await db.bingoTemplate.findUnique({
@@ -183,11 +182,12 @@ export class LobbyStore {
             name: input.name,
             visibility: input.visibility ?? 'private',
             authorId: template.authorId,
+            game: input.game ?? template.game,
             tags: template.tags,
             language: template.language,
             fields: { create: input.fields.map((label, position) => ({ label, position })) },
           },
-          include: { fields: { orderBy: { position: 'asc' } } },
+          include: { fields: { orderBy: { position: 'asc' } }, author: true },
         }),
         db.bingoTemplate.update({ where: { id }, data: { deletedAt: new Date() } }),
       ]);
@@ -200,9 +200,10 @@ export class LobbyStore {
         data: {
           name: input.name,
           visibility: input.visibility ?? template.visibility,
+          game: input.game ?? null,
           fields: { create: input.fields.map((label, position) => ({ label, position })) },
         },
-        include: { fields: { orderBy: { position: 'asc' } } },
+        include: { fields: { orderBy: { position: 'asc' } }, author: true },
       });
     });
   }
@@ -241,6 +242,96 @@ export class LobbyStore {
     const user = await db.user.findUnique({ where: { twitchUserId } });
     if (!user) return;
     await db.templateFavorite.deleteMany({ where: { userId: user.id, templateId } });
+  }
+  async duplicateTemplate(id: string, twitchUserId: string) {
+    const source = await db.bingoTemplate.findUnique({
+      where: { id },
+      include: { fields: { orderBy: { position: 'asc' } } },
+    });
+    if (!source || source.deletedAt) throw new HttpError(404, 'Template not found.');
+    if (!['public', 'unlisted', 'predefined'].includes(source.visibility)) {
+      const owner = source.authorId
+        ? await db.user.findUnique({ where: { id: source.authorId } })
+        : null;
+      if (owner?.twitchUserId !== twitchUserId)
+        throw new HttpError(403, 'Template not found or forbidden.');
+    }
+    const user = await ensureUser(twitchUserId);
+    return db.bingoTemplate.create({
+      data: {
+        name: `Kopie von ${source.name}`,
+        visibility: 'private',
+        authorId: user.id,
+        game: source.game,
+        tags: [],
+        language: source.language,
+        fields: { create: source.fields.map(({ label, position }) => ({ label, position })) },
+      },
+      include: { fields: { orderBy: { position: 'asc' } }, author: true },
+    });
+  }
+  async voteTemplate(twitchUserId: string, templateId: string, value: 1 | -1) {
+    const template = await db.bingoTemplate.findUnique({ where: { id: templateId } });
+    if (!template || template.deletedAt) throw new HttpError(404, 'Template not found.');
+    const user = await ensureUser(twitchUserId);
+    await db.templateVote.upsert({
+      where: { templateId_userId: { templateId, userId: user.id } },
+      update: { value },
+      create: { templateId, userId: user.id, value },
+    });
+  }
+  async removeVote(twitchUserId: string, templateId: string) {
+    const user = await db.user.findUnique({ where: { twitchUserId } });
+    if (!user) return;
+    await db.templateVote.deleteMany({ where: { templateId, userId: user.id } });
+  }
+  async restartLobby(lobbyId: string, hostTwitchUserId: string) {
+    const lobby = await db.lobby.findUnique({
+      where: { id: lobbyId },
+      include: {
+        host: true,
+        template: { include: { fields: { orderBy: { position: 'asc' } } } },
+        rounds: { orderBy: { roundNumber: 'asc' } },
+      },
+    });
+    if (!lobby || lobby.host.twitchUserId !== hostTwitchUserId)
+      throw new HttpError(403, 'Only the host can restart the lobby.');
+    if (!['running', 'paused'].includes(lobby.status))
+      throw new HttpError(400, 'Lobby must be running or paused to restart.');
+    const currentLeaderboard = await this.leaderboard(lobbyId);
+    const roundNumber = lobby.rounds.length + 1;
+    await db.lobbyRound.create({
+      data: { lobbyId, roundNumber, snapshot: JSON.parse(JSON.stringify(currentLeaderboard)) },
+    });
+    const participants = await db.lobbyParticipant.findMany({
+      where: { lobbyId, leftAt: null },
+      include: { card: { select: { id: true } } },
+    });
+    const cardIds = participants.flatMap((p) => (p.card ? [p.card.id] : []));
+    await db.playerCard.deleteMany({ where: { id: { in: cardIds } } });
+    await db.bingoResult.deleteMany({ where: { lobbyId } });
+    await db.lobbyEvent.deleteMany({ where: { lobbyId } });
+    await Promise.all(
+      participants.map((participant) => {
+        const fieldOrder = shuffleCard(lobby.template.fields);
+        return db.playerCard.create({
+          data: {
+            participantId: participant.id,
+            fields: {
+              create: fieldOrder.map((field, position) => ({
+                templateFieldId: field.id,
+                position,
+              })),
+            },
+          },
+        });
+      }),
+    );
+    await db.lobby.update({
+      where: { id: lobbyId },
+      data: { status: 'running', startedAt: new Date() },
+    });
+    return { roundNumber };
   }
   async listApprovedPublishers() {
     return db.approvedPublisher.findMany({ orderBy: { createdAt: 'desc' } });

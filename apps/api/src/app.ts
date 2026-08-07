@@ -110,9 +110,22 @@ export async function buildApp() {
     },
   });
   await app.register(swaggerUi, { routePrefix: '/documentation' });
-  app.addHook('onReady', async () => {
-    await store.ensurePredefinedTemplates();
-  });
+  // Twitch app-access token cache for game search
+  let twitchAppToken: { token: string; expiresAt: number } | null = null;
+  async function getTwitchAppToken(): Promise<string> {
+    if (twitchAppToken && twitchAppToken.expiresAt > Date.now() + 60_000) return twitchAppToken.token;
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+    if (!clientId || !clientSecret) throw new Error('Twitch credentials not configured.');
+    const res = await fetch(
+      `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
+      { method: 'POST' },
+    );
+    if (!res.ok) throw new Error('Could not obtain Twitch app token.');
+    const data = (await res.json()) as { access_token: string; expires_in: number };
+    twitchAppToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+    return twitchAppToken.token;
+  }
   const cleanupInterval = setInterval(
     () => {
       store.cleanupStaleLobbies().catch((error) => app.log.error(error, 'Stale lobby cleanup failed'));
@@ -268,7 +281,7 @@ export async function buildApp() {
   );
   app.get('/api/templates/public', async (request) => {
     const { search } = z.object({ search: z.string().max(100).optional() }).parse(request.query);
-    return store.listPublicTemplates(search);
+    return store.listPublicTemplates(search, (await sessionUser(request))?.id);
   });
   app.get('/api/templates/favorites', async (request, reply) => {
     const user = await sessionUser(request);
@@ -309,6 +322,7 @@ export async function buildApp() {
         name: z.string().min(1).max(100),
         fields: z.array(z.string().max(160)).min(25).max(50),
         visibility: z.enum(['private', 'public', 'unlisted']).optional(),
+        game: z.string().max(100).optional(),
       })
       .parse(request.body);
     try {
@@ -326,12 +340,62 @@ export async function buildApp() {
         name: z.string().min(1).max(100),
         fields: z.array(z.string().max(160)).min(25).max(50),
         visibility: z.enum(['private', 'public', 'unlisted']).optional(),
+        game: z.string().max(100).optional(),
       })
       .parse(request.body);
     try {
       return await store.updateTemplate(id, user.id, input);
     } catch (error) {
       return reply.code(errorStatus(error, 403)).send({ error: (error as Error).message });
+    }
+  });
+  app.post('/api/templates/:id/duplicate', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    try {
+      return reply.code(201).send(await store.duplicateTemplate(id, user.id));
+    } catch (error) {
+      return reply.code(errorStatus(error, 400)).send({ error: (error as Error).message });
+    }
+  });
+  app.post('/api/templates/:id/vote', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    const { value } = z.object({ value: z.union([z.literal(1), z.literal(-1)]) }).parse(request.body);
+    try {
+      await store.voteTemplate(user.id, id, value);
+      return reply.code(204).send();
+    } catch (error) {
+      return reply.code(errorStatus(error, 400)).send({ error: (error as Error).message });
+    }
+  });
+  app.delete('/api/templates/:id/vote', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { id } = z.object({ id: z.string() }).parse(request.params);
+    await store.removeVote(user.id, id);
+    return reply.code(204).send();
+  });
+  app.get('/api/games/search', async (request, reply) => {
+    const { q } = z.object({ q: z.string().min(1).max(100) }).parse(request.query);
+    try {
+      const token = await getTwitchAppToken();
+      const res = await fetch(
+        `https://api.twitch.tv/helix/search/categories?query=${encodeURIComponent(q)}&first=10`,
+        {
+          headers: {
+            'Client-ID': process.env.TWITCH_CLIENT_ID ?? '',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      if (!res.ok) return reply.code(502).send({ error: 'Game search unavailable.' });
+      const data = (await res.json()) as { data: Array<{ id: string; name: string; box_art_url: string }> };
+      return data.data.map((g) => ({ id: g.id, name: g.name, boxArtUrl: g.box_art_url }));
+    } catch {
+      return reply.code(502).send({ error: 'Game search unavailable.' });
     }
   });
   app.delete('/api/templates/:id', async (request, reply) => {
@@ -545,6 +609,18 @@ export async function buildApp() {
       return lobby;
     } catch (error) {
       return reply.code(403).send({ error: (error as Error).message });
+    }
+  });
+  app.post('/api/lobbies/:lobbyId/restart', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+    const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);
+    try {
+      const result = await store.restartLobby(lobbyId, user.id);
+      broadcast(lobbyId, { type: 'lobby.restarted', roundNumber: result.roundNumber });
+      return result;
+    } catch (error) {
+      return reply.code(errorStatus(error, 403)).send({ error: (error as Error).message });
     }
   });
   app.get('/api/history/hosted/:userId', async (request, reply) => {
