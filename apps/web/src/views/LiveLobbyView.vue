@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
-import { ExternalLink, Minimize2, Maximize2, Copy, Check, Plus } from '@lucide/vue';
+import { ExternalLink, Minimize2, Maximize2, Copy, Check, Plus, RefreshCw } from '@lucide/vue';
 import { useLobbyStore } from '../stores/lobby';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
@@ -22,6 +22,9 @@ const loadError = ref('');
 const taskSearch = ref('');
 const pendingTaskIndex = ref<number | null>(null);
 const pendingConfirmIndex = ref<number | null>(null);
+const pendingRestart = ref(false);
+const roundToast = ref('');
+let toastTimer: number | undefined;
 
 const confirmBeforeMarking = ref(localStorage.getItem('bingo-confirm-tiles') === 'true');
 watch(confirmBeforeMarking, (val) => localStorage.setItem('bingo-confirm-tiles', String(val)));
@@ -105,6 +108,19 @@ function confirmIndividualToggle() {
   if (index === null) return;
   lobby.toggleField(index);
 }
+
+async function confirmRestartLobby() {
+  pendingRestart.value = false;
+  await lobby.restartLobby();
+}
+
+watchEffect(() => {
+  if (lobby.roundNumber > 0) {
+    roundToast.value = t('roundStarted').replace('{n}', String(lobby.roundNumber));
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => { roundToast.value = ''; }, 3500);
+  }
+});
 </script>
 
 <template>
@@ -123,6 +139,9 @@ function confirmIndividualToggle() {
         </p>
       </div>
       <div v-if="isHostView" class="session-actions">
+        <button class="button secondary" @click="pendingRestart = true">
+          <RefreshCw :size="14" /> {{ t('restartRound') }}
+        </button>
         <button class="button" @click="lobby.endLobby()">{{ t('endSession') }}</button>
       </div>
     </div>
@@ -237,5 +256,16 @@ function confirmIndividualToggle() {
       @cancel="pendingConfirmIndex = null"
       @confirm="confirmIndividualToggle"
     />
+    <BaseModal
+      v-if="pendingRestart"
+      :title="t('confirmRestartRoundTitle')"
+      :body="t('confirmRestartRoundBody')"
+      :cancel-label="t('cancel')"
+      :confirm-label="t('restartRound')"
+      danger
+      @cancel="pendingRestart = false"
+      @confirm="confirmRestartLobby"
+    />
+    <div v-if="roundToast" class="round-toast">{{ roundToast }}</div>
   </section>
 </template>
