@@ -593,8 +593,23 @@ export class LobbyStore {
     const completed = new Set(
       participant.card.fields.filter((field) => field.completedAt).map((field) => field.position),
     );
-    if (!isWinningCard(completed, participant.lobby.winningCondition))
+    if (!isWinningCard(completed, participant.lobby.winningCondition)) {
+      const hadResult = await db.bingoResult.findUnique({ where: { participantId } });
+      if (hadResult) {
+        await db.bingoResult.deleteMany({ where: { participantId } });
+        const remaining = await db.bingoResult.findMany({
+          where: { lobbyId: participant.lobbyId },
+          orderBy: { completedAt: 'asc' },
+        });
+        for (let i = 0; i < remaining.length; i++) {
+          await db.bingoResult.update({
+            where: { id: remaining[i].id },
+            data: { placement: i + 1, isWinner: i === 0 },
+          });
+        }
+      }
       return { won: false, completedFields: completed.size };
+    }
     const existing = await db.bingoResult.findUnique({ where: { participantId } });
     if (existing) return { won: true, result: existing };
     for (let attempt = 0; attempt < 3; attempt += 1) {

@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import {
-  addApprovedPublisher,
   addFavoriteTemplate,
-  listApprovedPublishers,
   listFavoriteTemplates,
   listPublicTemplates,
-  removeApprovedPublisher,
   removeFavoriteTemplate,
-  type ApprovedPublisher,
   type TemplateSummary,
 } from '../api';
 import { useSessionStore } from '../stores/session';
@@ -16,8 +12,6 @@ import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
 import BaseInput from '../components/BaseInput.vue';
 import BaseCheckbox from '../components/BaseCheckbox.vue';
-
-const SUPER_PUBLISHER_LOGIN = 'landminentester';
 
 const session = useSessionStore();
 const ui = useUiStore();
@@ -28,10 +22,6 @@ const favoritesOnly = ref(false);
 const templates = ref<TemplateSummary[]>([]);
 const favoriteIds = ref<Set<string>>(new Set());
 const error = ref('');
-
-const publishers = ref<ApprovedPublisher[]>([]);
-const newPublisherLogin = ref('');
-const isSuperPublisher = computed(() => session.twitchUser?.login === SUPER_PUBLISHER_LOGIN);
 
 const visibleTemplates = computed(() =>
   favoritesOnly.value
@@ -52,13 +42,9 @@ async function loadFavorites() {
   const favorites = await listFavoriteTemplates().catch(() => []);
   favoriteIds.value = new Set(favorites.map((template) => template.id));
 }
-async function loadPublishers() {
-  if (!isSuperPublisher.value) return;
-  publishers.value = await listApprovedPublishers().catch(() => []);
-}
 
 onMounted(async () => {
-  await Promise.all([loadTemplates(), loadFavorites(), loadPublishers()]);
+  await Promise.all([loadTemplates(), loadFavorites()]);
 });
 
 let searchTimer: number | undefined;
@@ -82,25 +68,6 @@ async function toggleFavorite(template: TemplateSummary) {
     error.value = (err as Error).message;
   }
 }
-
-async function addPublisher() {
-  if (!newPublisherLogin.value.trim()) return;
-  try {
-    await addApprovedPublisher(newPublisherLogin.value.trim());
-    newPublisherLogin.value = '';
-    await loadPublishers();
-  } catch (err) {
-    error.value = (err as Error).message;
-  }
-}
-async function removePublisher(id: string) {
-  try {
-    await removeApprovedPublisher(id);
-    await loadPublishers();
-  } catch (err) {
-    error.value = (err as Error).message;
-  }
-}
 </script>
 
 <template>
@@ -108,28 +75,6 @@ async function removePublisher(id: string) {
     <p class="eyebrow">{{ t('browseTemplates') }}</p>
     <p>{{ t('browseTemplatesCopy') }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-
-    <div v-if="isSuperPublisher" class="publisher-manage">
-      <b>{{ t('publishersManageTitle') }}</b>
-      <p class="hint">{{ t('publishersManageCopy') }}</p>
-      <form class="publisher-manage-form" @submit.prevent="addPublisher">
-        <BaseInput
-          v-model="newPublisherLogin"
-          :label="t('channelLoginPlaceholder')"
-          hide-label
-          :placeholder="t('channelLoginPlaceholder')"
-        />
-        <button type="submit" class="button">{{ t('addChannel') }}</button>
-      </form>
-      <ul class="publisher-list">
-        <li v-for="publisher in publishers" :key="publisher.id">
-          <span>{{ publisher.loginName }}</span>
-          <button class="icon-button danger" type="button" @click="removePublisher(publisher.id)">
-            {{ t('removeChannel') }}
-          </button>
-        </li>
-      </ul>
-    </div>
 
     <div class="browser-toolbar">
       <BaseInput
@@ -153,12 +98,11 @@ async function removePublisher(id: string) {
         >
           {{ favoriteIds.has(template.id) ? '★' : '☆' }}
         </button>
-        <b>{{ template.name }}</b>
-        <small
-          >{{ template.fields.length }} {{ t('taskPoolCount') }}<template v-if="template.author">
-            · {{ t('by') }} {{ template.author.displayName }}</template
-          ></small
-        >
+        <p class="browser-card-title">{{ template.name }}</p>
+        <div class="browser-card-meta">
+          <span class="browser-card-chip">{{ template.fields.length }} {{ t('taskPoolCount') }}</span>
+          <span v-if="template.author" class="browser-card-author">{{ t('by') }} {{ template.author.displayName }}</span>
+        </div>
       </article>
       <p v-if="!visibleTemplates.length" class="muted">{{ t('noPublicTemplates') }}</p>
     </div>

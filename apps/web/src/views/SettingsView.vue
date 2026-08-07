@@ -1,6 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { createApiKey, listApiKeys, revokeApiKey, type ApiKeySummary } from '../api';
+import { computed, onMounted, ref } from 'vue';
+import {
+  addApprovedPublisher,
+  createApiKey,
+  listApiKeys,
+  listApprovedPublishers,
+  removeApprovedPublisher,
+  revokeApiKey,
+  type ApiKeySummary,
+  type ApprovedPublisher,
+} from '../api';
 import { useSessionStore } from '../stores/session';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
@@ -8,6 +17,7 @@ import BaseInput from '../components/BaseInput.vue';
 import BaseCheckbox from '../components/BaseCheckbox.vue';
 import BaseButton from '../components/BaseButton.vue';
 
+const SUPER_PUBLISHER_LOGIN = 'landminentester';
 const SCOPES = ['session:read', 'lobby:read', 'leaderboard:read', 'statistics:read'] as const;
 const SCOPE_LABEL_KEYS: Record<(typeof SCOPES)[number], TranslationKey> = {
   'session:read': 'scopeSessionRead',
@@ -30,10 +40,34 @@ const selectedScopes = ref<Record<string, boolean>>({
 const shownApiKey = ref('');
 const error = ref('');
 
+const isSuperPublisher = computed(() => session.twitchUser?.login === SUPER_PUBLISHER_LOGIN);
+const publishers = ref<ApprovedPublisher[]>([]);
+const newPublisherLogin = ref('');
+
 onMounted(refresh);
 
 async function refresh() {
   if (session.twitchUser) apiKeys.value = await listApiKeys(session.twitchUser.id).catch(() => []);
+  if (isSuperPublisher.value) publishers.value = await listApprovedPublishers().catch(() => []);
+}
+
+async function addPublisher() {
+  if (!newPublisherLogin.value.trim()) return;
+  try {
+    await addApprovedPublisher(newPublisherLogin.value.trim());
+    newPublisherLogin.value = '';
+    publishers.value = await listApprovedPublishers().catch(() => []);
+  } catch (err) {
+    error.value = (err as Error).message;
+  }
+}
+async function removePublisher(id: string) {
+  try {
+    await removeApprovedPublisher(id);
+    publishers.value = await listApprovedPublishers().catch(() => []);
+  } catch (err) {
+    error.value = (err as Error).message;
+  }
 }
 
 async function createIntegrationKey() {
@@ -100,6 +134,29 @@ async function disableApiKey(id: string) {
         </button>
       </article>
       <p v-if="!apiKeys.length" class="muted">{{ t('noApiKeys') }}</p>
+    </div>
+
+    <div v-if="isSuperPublisher" class="publisher-panel">
+      <p class="eyebrow">{{ t('publishersManageTitle') }}</p>
+      <h2>{{ t('publishersManageTitle') }}</h2>
+      <p class="hint">{{ t('publishersManageCopy') }}</p>
+      <form class="publisher-manage-form" @submit.prevent="addPublisher">
+        <BaseInput
+          v-model="newPublisherLogin"
+          :label="t('channelLoginPlaceholder')"
+          hide-label
+          :placeholder="t('channelLoginPlaceholder')"
+        />
+        <button type="submit" class="button">{{ t('addChannel') }}</button>
+      </form>
+      <ul class="publisher-list">
+        <li v-for="publisher in publishers" :key="publisher.id">
+          <span>{{ publisher.loginName }}</span>
+          <button class="icon-button danger" type="button" @click="removePublisher(publisher.id)">
+            {{ t('removeChannel') }}
+          </button>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

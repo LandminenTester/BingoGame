@@ -131,6 +131,7 @@ export default {
     atLeastOneScope: 'Please select at least one permission.',
     searchTasks: 'Search task …',
     noMatchingTasks: 'No matching tasks.',
+    confirmTiles: 'Confirm tiles',
     confirmMarkTaskTitle: 'Confirm task?',
     confirmMarkTaskBody: 'The task will be marked as completed for all participants.',
     confirmUnmarkTaskTitle: 'Undo confirmation?',

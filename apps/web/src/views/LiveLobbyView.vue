@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useLobbyStore } from '../stores/lobby';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
 import BaseInput from '../components/BaseInput.vue';
 import BaseModal from '../components/BaseModal.vue';
+import BaseCheckbox from '../components/BaseCheckbox.vue';
 
 const props = defineProps<{ lobbyId: string }>();
 const route = useRoute();
@@ -19,6 +20,26 @@ const copied = ref(false);
 const loadError = ref('');
 const taskSearch = ref('');
 const pendingTaskIndex = ref<number | null>(null);
+const pendingConfirmIndex = ref<number | null>(null);
+
+const confirmBeforeMarking = ref(localStorage.getItem('bingo-confirm-tiles') === 'true');
+watch(confirmBeforeMarking, (val) => localStorage.setItem('bingo-confirm-tiles', String(val)));
+
+function formatTime(iso: string) {
+  return new Intl.DateTimeFormat('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(iso));
+}
+
+function openPopout() {
+  window.open(
+    `/popout/board/${props.lobbyId}`,
+    'bingo-popout',
+    'width=800,height=800,resizable=yes,menubar=no,toolbar=no,location=no',
+  );
+}
 
 onMounted(async () => {
   if (lobby.activeLobbyId === props.lobbyId) {
@@ -59,10 +80,21 @@ function confirmHostToggle() {
 
 function onTileClick(index: number) {
   if (lobby.gameMode === 'individual') {
-    lobby.toggleField(index);
+    if (confirmBeforeMarking.value) {
+      pendingConfirmIndex.value = index;
+    } else {
+      lobby.toggleField(index);
+    }
     return;
   }
   if (isHostView.value && lobby.gameMode === 'streamer_controlled') requestHostToggle(index);
+}
+
+function confirmIndividualToggle() {
+  const index = pendingConfirmIndex.value;
+  pendingConfirmIndex.value = null;
+  if (index === null) return;
+  lobby.toggleField(index);
 }
 </script>
 
@@ -95,8 +127,12 @@ function onTileClick(index: number) {
     <div class="board-layout">
       <section class="board-section">
         <div class="section-label">
-          <span>{{ t('yourCard') }}</span
-          ><b>{{ lobby.completion }}/25 {{ t('completed') }}</b>
+          <span>{{ t('yourCard') }}</span>
+          <div class="section-label-controls">
+            <BaseCheckbox v-model="confirmBeforeMarking" :label="t('confirmTiles')" />
+            <button type="button" class="popout-btn" @click="openPopout">⤢ Popout</button>
+            <b>{{ lobby.completion }}/25 {{ t('completed') }}</b>
+          </div>
         </div>
         <div class="bingo-board" :aria-label="t('yourCard')">
           <button
@@ -155,7 +191,7 @@ function onTileClick(index: number) {
               <b>{{ entry.placement }}</b
               ><span class="avatar mini">{{ entry.displayName.slice(0, 2).toUpperCase() }}</span
               ><span
-                >{{ entry.displayName }}<small>{{ entry.completedAt || t('inProgress') }}</small></span
+                >{{ entry.displayName }}<small>{{ entry.completedAt ? formatTime(entry.completedAt) : t('inProgress') }}</small></span
               ><strong>{{ entry.completedFields }}/25</strong>
             </li>
           </ol>
@@ -178,6 +214,15 @@ function onTileClick(index: number) {
       :confirm-label="t('confirmAction')"
       @cancel="pendingTaskIndex = null"
       @confirm="confirmHostToggle"
+    />
+    <BaseModal
+      v-if="pendingConfirmIndex !== null"
+      :title="lobby.marked.has(pendingConfirmIndex) ? t('confirmUnmarkTaskTitle') : t('confirmMarkTaskTitle')"
+      :body="lobby.marked.has(pendingConfirmIndex) ? t('confirmUnmarkTaskBody') : t('confirmMarkTaskBody')"
+      :cancel-label="t('cancel')"
+      :confirm-label="t('confirmAction')"
+      @cancel="pendingConfirmIndex = null"
+      @confirm="confirmIndividualToggle"
     />
   </section>
 </template>

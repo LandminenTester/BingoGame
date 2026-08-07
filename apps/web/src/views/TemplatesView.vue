@@ -104,16 +104,21 @@ async function confirmDelete() {
             :class="{ active: templates.selectedId === template.id }"
             @click="loadTemplate(template)"
           >
-            <b>{{ template.name }}</b>
-            <small>{{ template.visibility }} · {{ template.fields.length }} {{ t('taskPoolCount') }}</small>
-            <span class="template-item-actions">
-              <button class="icon-button" type="button" @click.stop="loadTemplate(template)">
-                {{ t('edit') }}
-              </button>
-              <button class="icon-button danger" type="button" @click.stop="requestDelete(template)">
-                {{ t('delete') }}
-              </button>
-            </span>
+            <div class="template-item-row">
+              <div class="template-item-header">
+                <b>{{ template.name }}</b>
+                <span :class="['visibility-badge', template.visibility]">{{ template.visibility }}</span>
+              </div>
+              <span class="template-item-actions">
+                <button class="icon-button" type="button" @click.stop="loadTemplate(template)">
+                  {{ t('edit') }}
+                </button>
+                <button class="icon-button danger" type="button" @click.stop="requestDelete(template)">
+                  {{ t('delete') }}
+                </button>
+              </span>
+            </div>
+            <small class="template-item-count">{{ template.fields.length }} {{ t('taskPoolCount') }}</small>
           </article>
           <p v-if="!templates.items.length" class="muted">{{ t('noTemplates') }}</p>
         </div>
@@ -132,7 +137,7 @@ async function confirmDelete() {
               { value: 'unlisted', label: t('unlisted') },
             ]"
           />
-          <div class="task-pool-list">
+          <div class="task-pool-grid">
             <div v-for="(_, index) in fields" :key="index" class="task-pool-row">
               <span class="task-pool-index">{{ index + 1 }}</span>
               <BaseInput v-model="fields[index]" required maxlength="160" />

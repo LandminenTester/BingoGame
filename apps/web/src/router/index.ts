@@ -50,6 +50,12 @@ const router = createRouter({
         { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
       ],
     },
+    {
+      path: '/popout/board/:lobbyId',
+      name: 'popout-board',
+      component: () => import('../views/PopoutBoardView.vue'),
+      props: true,
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 });
@@ -59,7 +65,6 @@ router.beforeEach(async (to) => {
   if (session.status === 'unknown') await session.bootstrap();
 
   if (to.meta.requiresAuth && session.status === 'anonymous') return { name: 'landing' };
-  if (to.meta.requiresGuestLobby && session.status === 'anonymous') return { name: 'guest-join' };
   if (to.name === 'landing' && session.status !== 'anonymous') return { name: 'templates' };
   return true;
 });

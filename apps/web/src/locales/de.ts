@@ -132,6 +132,7 @@ export default {
     atLeastOneScope: 'Bitte mindestens eine Berechtigung wählen.',
     searchTasks: 'Aufgabe suchen …',
     noMatchingTasks: 'Keine passenden Aufgaben.',
+    confirmTiles: 'Bestätigung',
     confirmMarkTaskTitle: 'Aufgabe bestätigen?',
     confirmMarkTaskBody: 'Die Aufgabe wird für alle Teilnehmer:innen als erledigt markiert.',
     confirmUnmarkTaskTitle: 'Bestätigung zurücknehmen?',

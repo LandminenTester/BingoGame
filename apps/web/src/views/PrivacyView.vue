@@ -9,7 +9,7 @@ const isGerman = ui.locale === 'de';
 </script>
 
 <template>
-  <section class="legal-view">
+  <main class="legal-view">
     <p class="eyebrow">{{ t('privacyPolicy') }}</p>
     <h1>{{ t('privacyPolicy') }}</h1>
     <div class="notice">{{ t('imprintNotice') }}</div>
@@ -79,5 +79,5 @@ const isGerman = ui.locale === 'de';
     <RouterLink :to="{ name: 'landing' }" class="button secondary legal-back">{{
       isGerman ? 'Zurück' : 'Back'
     }}</RouterLink>
-  </section>
+  </main>
 </template>
