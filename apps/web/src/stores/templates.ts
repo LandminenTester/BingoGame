@@ -11,6 +11,7 @@ export interface TemplateFormInput {
   name: string;
   fields: string[];
   visibility: 'private' | 'public' | 'unlisted';
+  game?: string;
 }
 
 export const useTemplatesStore = defineStore('templates', {

@@ -8,6 +8,7 @@ import {
   guestJoinLobby,
   joinLobby as joinLobbyRequest,
   markCardField,
+  restartLobby as restartLobbyRequest,
   setLobbyStatus,
   type JoinedLobby,
   type LeaderboardEntry,
@@ -30,7 +31,8 @@ export const useLobbyStore = defineStore('lobby', {
     leaderboard: [] as LeaderboardEntry[],
     members: [] as LobbyMember[],
     error: '',
-    socket: undefined as WebSocket | undefined,
+    roundNumber: 0,
+    disconnectFn: null as (() => void) | null,
   }),
   getters: {
     completion: (state) => state.marked.size,
@@ -50,6 +52,7 @@ export const useLobbyStore = defineStore('lobby', {
       this.leaderboard = [];
       this.members = [];
       this.error = '';
+      this.roundNumber = 0;
     },
     applyCard(card: JoinedLobby['card']) {
       this.cardFieldIds = card?.fields.map((field) => field.id) ?? [];
@@ -146,14 +149,28 @@ export const useLobbyStore = defineStore('lobby', {
     },
     connect() {
       if (!this.activeLobbyId) return;
-      this.socket?.close();
-      this.socket = connectLobbyEvents(this.activeLobbyId, (event) => this.handleEvent(event));
+      this.disconnectFn?.();
+      this.disconnectFn = connectLobbyEvents(this.activeLobbyId, (event) => this.handleEvent(event));
     },
     disconnect() {
-      this.socket?.close();
-      this.socket = undefined;
+      this.disconnectFn?.();
+      this.disconnectFn = null;
+    },
+    async restartLobby() {
+      if (!this.activeLobbyId) return;
+      const result = await restartLobbyRequest(this.activeLobbyId);
+      this.roundNumber = result.roundNumber;
     },
     handleEvent(event: any) {
+      if (event.type === 'lobby.restarted') {
+        this.roundNumber = event.roundNumber;
+        this.marked = new Set();
+        this.cardFieldIds = [];
+        this.templateFieldIds = [];
+        this.boardTasks = [];
+        this.leaderboard = [];
+        return;
+      }
       if (event.type === 'lobby.members_updated') {
         this.members = event.members ?? this.members;
         return;

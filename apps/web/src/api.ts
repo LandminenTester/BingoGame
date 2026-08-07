@@ -10,8 +10,17 @@ export interface TemplateSummary {
   id: string;
   name: string;
   visibility: string;
+  game?: string | null;
   fields: Array<{ id: string; label: string }>;
   author?: { displayName: string; loginName: string } | null;
+  upvotes?: number;
+  downvotes?: number;
+  myVote?: 1 | -1 | null;
+}
+export interface GameSearchResult {
+  id: string;
+  name: string;
+  boxArtUrl: string;
 }
 export interface LobbySummary {
   id: string;
@@ -50,6 +59,7 @@ export async function createTemplate(input: {
   name: string;
   fields: string[];
   visibility: 'private' | 'public' | 'unlisted';
+  game?: string;
 }): Promise<TemplateSummary> {
   return requestJson(
     '/api/templates',
@@ -59,7 +69,7 @@ export async function createTemplate(input: {
 }
 export async function updateTemplate(
   id: string,
-  input: { name: string; fields: string[]; visibility: 'private' | 'public' | 'unlisted' },
+  input: { name: string; fields: string[]; visibility: 'private' | 'public' | 'unlisted'; game?: string },
 ): Promise<TemplateSummary> {
   return requestJson(
     `/api/templates/${id}`,
@@ -89,6 +99,24 @@ export async function removeFavoriteTemplate(id: string): Promise<void> {
     { method: 'DELETE' },
     'Could not remove favorite.',
   );
+}
+export async function duplicateTemplate(id: string): Promise<TemplateSummary> {
+  return requestJson(`/api/templates/${id}/duplicate`, { method: 'POST' }, 'Could not duplicate template.');
+}
+export async function voteTemplate(id: string, value: 1 | -1): Promise<void> {
+  return requestJson(`/api/templates/${id}/vote`, { method: 'POST', body: JSON.stringify({ value }) }, 'Could not vote.');
+}
+export async function removeVoteTemplate(id: string): Promise<void> {
+  return requestJson(`/api/templates/${id}/vote`, { method: 'DELETE' }, 'Could not remove vote.');
+}
+export async function searchGames(q: string): Promise<GameSearchResult[]> {
+  return requestJson(`/api/games/search?q=${encodeURIComponent(q)}`, { method: 'GET' }, 'Game search failed.');
+}
+export async function getTemplate(id: string): Promise<TemplateSummary> {
+  return requestJson(`/api/templates/${id}`, { method: 'GET' }, 'Could not load template.');
+}
+export async function restartLobby(lobbyId: string): Promise<{ roundNumber: number }> {
+  return requestJson(`/api/lobbies/${lobbyId}/restart`, { method: 'POST' }, 'Could not restart lobby.');
 }
 export interface ApprovedPublisher {
   id: string;
@@ -225,18 +253,44 @@ export async function confirmLobbyTask(
   }
 }
 
-export function connectLobbyEvents(lobbyId: string, onEvent: (event: any) => void): WebSocket {
-  const url = new URL(`${apiBase || window.location.origin}/api/lobbies/${lobbyId}/events`);
+export function connectLobbyEvents(
+  lobbyId: string,
+  onEvent: (event: any) => void,
+): () => void {
+  const origin = apiBase || window.location.origin;
+  const url = new URL(`${origin}/api/lobbies/${lobbyId}/events`);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const socket = new WebSocket(url);
-  socket.addEventListener('message', (message) => {
-    try {
-      onEvent(JSON.parse(message.data));
-    } catch {
-      /* ignore invalid events */
-    }
-  });
-  return socket;
+
+  let ws: WebSocket;
+  let retryMs = 1000;
+  let stopped = false;
+
+  function connect() {
+    if (stopped) return;
+    ws = new WebSocket(url);
+    ws.addEventListener('message', (message) => {
+      try {
+        onEvent(JSON.parse(message.data));
+      } catch {
+        /* ignore invalid events */
+      }
+    });
+    ws.addEventListener('open', () => {
+      retryMs = 1000;
+    });
+    ws.addEventListener('close', () => {
+      if (!stopped) {
+        setTimeout(connect, retryMs);
+        retryMs = Math.min(retryMs * 2, 30_000);
+      }
+    });
+  }
+
+  connect();
+  return () => {
+    stopped = true;
+    ws?.close();
+  };
 }
 
 export async function setLobbyStatus(
