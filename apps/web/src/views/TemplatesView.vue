@@ -13,6 +13,16 @@ import type { TemplateSummary } from '../api';
 const TASK_MIN = 25;
 const TASK_MAX = 50;
 
+const VISIBILITY_LABELS: Record<string, string> = {
+  private: 'Privat',
+  public: 'Vorbehalt',
+  unlisted: 'Ungelistet',
+  predefined: 'Vorgabe',
+};
+function visibilityLabel(v: string) {
+  return VISIBILITY_LABELS[v] ?? v;
+}
+
 const templates = useTemplatesStore();
 const ui = useUiStore();
 const route = useRoute();
@@ -101,24 +111,15 @@ async function confirmDelete() {
             v-for="template in templates.items"
             :key="template.id"
             class="template-item"
-            :class="{ active: templates.selectedId === template.id }"
+            :class="['tpl-vis--' + template.visibility, { active: templates.selectedId === template.id }]"
             @click="loadTemplate(template)"
           >
-            <div class="template-item-row">
-              <div class="template-item-header">
-                <b>{{ template.name }}</b>
-                <span :class="['visibility-badge', template.visibility]">{{ template.visibility }}</span>
-              </div>
-              <span class="template-item-actions">
-                <button class="icon-button" type="button" @click.stop="loadTemplate(template)">
-                  {{ t('edit') }}
-                </button>
-                <button class="icon-button danger" type="button" @click.stop="requestDelete(template)">
-                  {{ t('delete') }}
-                </button>
-              </span>
-            </div>
-            <small class="template-item-count">{{ template.fields.length }} {{ t('taskPoolCount') }}</small>
+            <span class="template-item-name">{{ template.name }}</span>
+            <span :class="['visibility-badge', template.visibility]">{{ visibilityLabel(template.visibility) }}</span>
+            <span class="template-item-actions">
+              <button class="tpl-btn" type="button" :title="t('edit')" @click.stop="loadTemplate(template)">✎</button>
+              <button class="tpl-btn tpl-btn--danger" type="button" :title="t('delete')" @click.stop="requestDelete(template)">✕</button>
+            </span>
           </article>
           <p v-if="!templates.items.length" class="muted">{{ t('noTemplates') }}</p>
         </div>
@@ -133,10 +134,11 @@ async function confirmDelete() {
             :label="t('templateVisibility')"
             :options="[
               { value: 'private', label: t('private') },
-              { value: 'public', label: t('public') },
+              { value: 'public', label: t('publicPending') },
               { value: 'unlisted', label: t('unlisted') },
             ]"
           />
+          <p v-if="visibility === 'public'" class="hint">{{ t('publicPendingHint') }}</p>
           <div class="task-pool-grid">
             <div v-for="(_, index) in fields" :key="index" class="task-pool-row">
               <span class="task-pool-index">{{ index + 1 }}</span>

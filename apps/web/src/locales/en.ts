@@ -56,6 +56,8 @@ export default {
     templateVisibility: 'Visibility',
     private: 'Private',
     public: 'Public',
+    publicPending: 'Public (Pending Approval)',
+    publicPendingHint: 'Public templates will only appear in the Browse list after admin approval.',
     unlisted: 'Unlisted',
     saveTemplate: 'Save template',
     noTemplates: 'No visible templates yet.',

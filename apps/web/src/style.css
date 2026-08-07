@@ -889,8 +889,8 @@ h2 {
 }
 .template-item-actions {
   display: flex;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 2px;
+  flex-shrink: 0;
 }
 .icon-button {
   border: 1px solid var(--line);
@@ -1172,13 +1172,14 @@ h2 {
 .visibility-badge {
   display: inline-flex;
   align-items: center;
-  font: 600 9px 'DM Mono', monospace;
-  letter-spacing: 0.06em;
+  font: 700 8px 'DM Mono', monospace;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   border-radius: 3px;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border: 1px solid currentColor;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .visibility-badge.private {
   color: var(--muted);
@@ -1186,14 +1187,14 @@ h2 {
   background: transparent;
 }
 .visibility-badge.public {
-  color: var(--lime);
-  border-color: color-mix(in srgb, var(--lime) 40%, transparent);
-  background: color-mix(in srgb, var(--lime) 8%, transparent);
+  color: #f5a623;
+  border-color: color-mix(in srgb, #f5a623 45%, transparent);
+  background: color-mix(in srgb, #f5a623 9%, transparent);
 }
 .visibility-badge.unlisted {
-  color: #f5c842;
-  border-color: color-mix(in srgb, #f5c842 40%, transparent);
-  background: color-mix(in srgb, #f5c842 8%, transparent);
+  color: #e8d44d;
+  border-color: color-mix(in srgb, #e8d44d 40%, transparent);
+  background: color-mix(in srgb, #e8d44d 8%, transparent);
 }
 .visibility-badge.predefined {
   color: var(--accent-soft);
@@ -1201,29 +1202,66 @@ h2 {
   background: color-mix(in srgb, var(--accent-soft) 8%, transparent);
 }
 
-/* Template item: title row with badge and actions inline */
-.template-item-header {
+/* Template list — complete overhaul */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.template-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  padding: 10px 12px 10px 14px;
+  border-left: 3px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
   min-width: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 0;
 }
-.template-item-header b {
+.template-item:hover {
+  background: var(--surface-2);
+}
+.template-item.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.tpl-vis--public { border-left-color: #f5a623; }
+.tpl-vis--unlisted { border-left-color: #e8d44d; }
+.tpl-vis--predefined { border-left-color: var(--accent-soft); }
+.template-item-name {
+  flex: 1;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  flex: 1;
 }
-.template-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.template-item-row .template-item-actions {
+.tpl-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  margin-top: 0;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+.tpl-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.tpl-btn--danger:hover {
+  color: #ff8890;
+  background: color-mix(in srgb, #ff8890 12%, var(--surface-2));
 }
 
 /* Task pool 3-column grid */

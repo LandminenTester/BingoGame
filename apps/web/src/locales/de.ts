@@ -56,6 +56,8 @@ export default {
     templateVisibility: 'Sichtbarkeit',
     private: 'Privat',
     public: 'Öffentlich',
+    publicPending: 'Öffentlich (Vorbehalt)',
+    publicPendingHint: 'Öffentliche Vorlagen werden erst nach Admin-Freigabe in der Entdecken-Liste angezeigt.',
     unlisted: 'Nicht gelistet',
     saveTemplate: 'Vorlage speichern',
     noTemplates: 'Noch keine sichtbaren Vorlagen.',
