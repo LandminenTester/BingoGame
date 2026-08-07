@@ -817,7 +817,7 @@ export async function buildApp() {
     const approved = await store.listApprovedPublishers();
     const approvedLogins = new Set(approved.map((p) => p.loginName));
     approvedLogins.add(SUPER_PUBLISHER_LOGIN);
-    const allPublic = await db.template.findMany({
+    const allPublic = await db.bingoTemplate.findMany({
       where: { visibility: 'public' },
       include: { author: true, fields: { orderBy: { position: 'asc' } } },
       orderBy: { createdAt: 'asc' },
