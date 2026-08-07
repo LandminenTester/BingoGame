@@ -24,6 +24,12 @@ onMounted(async () => {
     return;
   }
 
+  if (session.status === 'twitch') {
+    lobby.activeLobbyId = props.lobbyId;
+    lobby.connect();
+    return;
+  }
+
   loadError.value = 'Keine aktive Lobby-Session gefunden.';
 });
 

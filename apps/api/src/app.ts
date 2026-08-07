@@ -380,7 +380,7 @@ export async function buildApp() {
         gameMode: z.enum(['individual', 'streamer_controlled']),
         winningCondition: z.enum(['first_line', 'full_card']),
         maxParticipants: z.number().int().min(1).max(1000),
-        password: z.string().min(8).max(128).optional(),
+        password: z.string().min(3).max(128).optional(),
         allowLateJoin: z.boolean().optional(),
         allowGuests: z.boolean().optional(),
       })
@@ -408,7 +408,22 @@ export async function buildApp() {
       const user = await sessionUser(request);
       if (!user) return reply.code(401).send({ error: 'Authentication required.' });
       try {
-        return await store.joinLobby(code, user.id, password);
+        const joined = await store.joinLobby(code, user.id, password);
+        const lobbyRecord = await db.lobby.findUnique({ where: { code: code.toUpperCase() } });
+        if (lobbyRecord) {
+          const participants = await db.lobbyParticipant.findMany({
+            where: { lobbyId: lobbyRecord.id },
+            include: { user: true },
+          });
+          const members = participants.map((p) => ({
+            participantId: p.id,
+            displayName: p.user?.displayName ?? p.guestName ?? 'Gast',
+            role: p.role,
+            joinedAt: p.joinedAt,
+          }));
+          broadcast(lobbyRecord.id, { type: 'lobby.members_updated', members });
+        }
+        return joined;
       } catch (error) {
         return reply.code(400).send({ error: (error as Error).message });
       }
@@ -460,6 +475,17 @@ export async function buildApp() {
           signed: true,
           maxAge: 60 * 60 * 24 * 30,
         });
+        const guestParticipants = await db.lobbyParticipant.findMany({
+          where: { lobbyId: lobby.id },
+          include: { user: true },
+        });
+        const guestMembers = guestParticipants.map((p) => ({
+          participantId: p.id,
+          displayName: p.user?.displayName ?? p.guestName ?? 'Gast',
+          role: p.role,
+          joinedAt: p.joinedAt,
+        }));
+        broadcast(lobby.id, { type: 'lobby.members_updated', members: guestMembers });
         return reply.code(201).send({
           participantId: participant.id,
           lobbyId: lobby.id,
@@ -783,6 +809,20 @@ export async function buildApp() {
       return reply.code(403).send({ error: (error as Error).message });
     }
     return lobby.template.fields;
+  });
+  app.get('/api/templates/pending-approval', async (request, reply) => {
+    const user = await sessionUser(request);
+    if (!user || user.login !== SUPER_PUBLISHER_LOGIN)
+      return reply.code(403).send({ error: 'Forbidden.' });
+    const approved = await store.listApprovedPublishers();
+    const approvedLogins = new Set(approved.map((p) => p.loginName));
+    approvedLogins.add(SUPER_PUBLISHER_LOGIN);
+    const allPublic = await db.template.findMany({
+      where: { visibility: 'public' },
+      include: { author: true, fields: { orderBy: { position: 'asc' } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    return allPublic.filter((t) => !approvedLogins.has(t.author?.loginName ?? ''));
   });
   app.get('/api/lobbies/:lobbyId/events', { websocket: true }, async (socket: LobbySocket, request) => {
     const { lobbyId } = z.object({ lobbyId: z.string() }).parse(request.params);

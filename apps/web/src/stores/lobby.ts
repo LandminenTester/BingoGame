@@ -154,6 +154,10 @@ export const useLobbyStore = defineStore('lobby', {
       this.socket = undefined;
     },
     handleEvent(event: any) {
+      if (event.type === 'lobby.members_updated') {
+        this.members = event.members ?? this.members;
+        return;
+      }
       if (event.type === 'lobby.snapshot') {
         const session = useSessionStore();
         const participant = event.lobby?.participants?.find((entry: any) =>

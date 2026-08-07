@@ -9,6 +9,15 @@ import BaseModal from '../components/BaseModal.vue';
 
 const ACTIVE_STATUSES = new Set(['draft', 'open', 'running', 'paused']);
 
+const STATUS_CLASS: Record<string, string> = {
+  running: 'history-status--running',
+  paused: 'history-status--paused',
+  completed: 'history-status--completed',
+  cancelled: 'history-status--cancelled',
+  draft: 'history-status--draft',
+  open: 'history-status--open',
+};
+
 const session = useSessionStore();
 const ui = useUiStore();
 const route = useRoute();
@@ -17,6 +26,18 @@ const history = ref<HistoryLobby[]>([]);
 const expanded = ref<Set<string>>(new Set());
 const pendingEnd = ref<HistoryLobby | null>(null);
 const error = ref('');
+
+const fmt = new Intl.DateTimeFormat('de-DE', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function formatDate(iso: string) {
+  return fmt.format(new Date(iso));
+}
 
 onMounted(refresh);
 
@@ -58,39 +79,62 @@ async function confirmEnd() {
     </nav>
     <template v-if="route.name === 'history'">
       <p class="eyebrow">{{ t('history') }}</p>
-      <p>{{ t('historyCopy') }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <div class="management-list">
-        <article v-for="entry in history" :key="entry.id">
-          <div class="api-key-card">
-            <div>
-              <b>{{ entry.name }}</b>
-              <small
-                >{{ entry.code }} · {{ entry.status }} · {{ entry._count.participants }}
-                {{ t('participantsLabel') }} · {{ entry.results.length }} {{ t('completedCards') }}</small
-              >
-            </div>
+      <div class="history-list">
+        <article v-for="entry in history" :key="entry.id" class="history-card">
+          <div class="history-card-header">
+            <p class="history-card-title">{{ entry.name }}</p>
+            <span :class="['history-status', STATUS_CLASS[entry.status] ?? '']">{{ entry.status }}</span>
+          </div>
+          <div class="history-card-meta">
+            <span class="history-chip">{{ formatDate(entry.createdAt) }}</span>
+            <span class="history-chip">{{ entry.code }}</span>
+            <span class="history-chip">{{ entry._count.participants }} {{ t('participantsLabel') }}</span>
+            <span class="history-chip">{{ entry.results.length }} {{ t('completedCards') }}</span>
+          </div>
+          <div class="history-card-actions">
+            <RouterLink
+              v-if="ACTIVE_STATUSES.has(entry.status)"
+              :to="{ name: 'app-lobby', params: { lobbyId: entry.id } }"
+              class="button"
+            >
+              {{ t('rejoinSession') }}
+            </RouterLink>
             <button
               v-if="ACTIVE_STATUSES.has(entry.status)"
-              class="icon-button danger"
+              class="button danger"
               type="button"
               @click="requestEnd(entry)"
             >
               {{ t('endSessionAction') }}
             </button>
+            <button class="history-participants-toggle" type="button" @click="toggleExpanded(entry.id)">
+              {{ t('participantsToggle') }} ({{ entry.participants.length }})
+              {{ expanded.has(entry.id) ? '▲' : '▼' }}
+            </button>
           </div>
-          <button class="participants-toggle" type="button" @click="toggleExpanded(entry.id)">
-            {{ t('participantsToggle') }} ({{ entry.participants.length }})
-          </button>
-          <ul v-if="expanded.has(entry.id)" class="participant-progress-list">
-            <li v-for="participant in entry.participants" :key="participant.participantId">
-              <span>{{ participant.displayName }}</span>
-              <b>{{ participant.completedFields }}/{{ participant.totalFields }} {{ t('progressLabel') }}</b>
-            </li>
-            <li v-if="!entry.participants.length">
-              <span class="muted">{{ t('noMembersYet') }}</span>
-            </li>
-          </ul>
+          <div v-if="expanded.has(entry.id)" class="history-participants">
+            <div
+              v-for="participant in entry.participants"
+              :key="participant.participantId"
+              class="history-participant"
+            >
+              <span class="avatar mini">{{ participant.displayName.slice(0, 2).toUpperCase() }}</span>
+              <span style="font-size:12px;">{{ participant.displayName }}</span>
+              <div>
+                <div class="progress-bar-track">
+                  <div
+                    class="progress-bar-fill"
+                    :style="{ width: participant.totalFields > 0 ? `${(participant.completedFields / participant.totalFields) * 100}%` : '0%' }"
+                  ></div>
+                </div>
+                <span style="font-size:9px;color:var(--muted);font-family:'DM Mono';">
+                  {{ participant.completedFields }}/{{ participant.totalFields }}
+                </span>
+              </div>
+            </div>
+            <p v-if="!entry.participants.length" class="muted">{{ t('noMembersYet') }}</p>
+          </div>
         </article>
         <p v-if="!history.length" class="muted">{{ t('noHostedSessions') }}</p>
       </div>

@@ -102,7 +102,7 @@ async function submit() {
         v-model="password"
         type="password"
         :label="t('optionalPassword')"
-        minlength="8"
+        minlength="3"
         maxlength="128"
         autocomplete="new-password"
       />

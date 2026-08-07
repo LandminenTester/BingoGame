@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTemplatesStore } from '../stores/templates';
 import { useUiStore } from '../stores/ui';
@@ -31,9 +31,23 @@ const t = (key: TranslationKey) => translate(ui.locale, key);
 const blankFields = () => Array.from({ length: TASK_MIN }, (_, index) => `Aufgabe ${index + 1}`);
 const name = ref('');
 const visibility = ref<'private' | 'public' | 'unlisted'>('private');
+const previousVisibility = ref<string>('private');
+const showPublicModal = ref(false);
 const fields = ref(blankFields());
 const error = ref('');
 const pendingDelete = ref<TemplateSummary | null>(null);
+
+watch(visibility, (newVal, oldVal) => {
+  if (newVal === 'public') {
+    previousVisibility.value = oldVal;
+    showPublicModal.value = true;
+  }
+});
+
+function cancelPublicModal() {
+  visibility.value = previousVisibility.value as 'private' | 'public' | 'unlisted';
+  showPublicModal.value = false;
+}
 
 onMounted(() => templates.fetchAll());
 
@@ -125,9 +139,12 @@ async function confirmDelete() {
         </div>
       </aside>
       <div class="template-editor">
-        <p class="eyebrow">{{ t('templateCopy') }}</p>
+        <div class="template-editor-header">
+          <p class="template-editor-copy">{{ t('templateCopy') }}</p>
+          <BaseButton type="submit" form="template-form">{{ t('saveTemplate') }}</BaseButton>
+        </div>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <form class="builder-form" @submit.prevent="submit">
+        <form id="template-form" class="builder-form" @submit.prevent="submit">
           <BaseInput v-model="name" :label="t('templateName')" required maxlength="100" />
           <BaseSelect
             v-model="visibility"
@@ -135,10 +152,8 @@ async function confirmDelete() {
             :options="[
               { value: 'private', label: t('private') },
               { value: 'public', label: t('publicPending') },
-              { value: 'unlisted', label: t('unlisted') },
             ]"
           />
-          <p v-if="visibility === 'public'" class="hint">{{ t('publicPendingHint') }}</p>
           <div class="task-pool-grid">
             <div v-for="(_, index) in fields" :key="index" class="task-pool-row">
               <span class="task-pool-index">{{ index + 1 }}</span>
@@ -163,7 +178,6 @@ async function confirmDelete() {
             + {{ t('addTaskRow') }}
           </button>
           <p class="hint">{{ t('taskPoolHint') }}</p>
-          <BaseButton type="submit" wide>{{ t('saveTemplate') }}</BaseButton>
         </form>
       </div>
     </section>
@@ -176,6 +190,15 @@ async function confirmDelete() {
       danger
       @cancel="pendingDelete = null"
       @confirm="confirmDelete"
+    />
+    <BaseModal
+      v-if="showPublicModal"
+      :title="t('publicModalTitle')"
+      :body="t('publicModalBody')"
+      :cancel-label="t('cancel')"
+      :confirm-label="t('confirmAction')"
+      @cancel="cancelPublicModal"
+      @confirm="showPublicModal = false"
     />
   </template>
   <RouterView v-else />

@@ -74,6 +74,9 @@ export async function listPublicTemplates(search?: string): Promise<TemplateSumm
   const query = search ? `?search=${encodeURIComponent(search)}` : '';
   return requestJson(`/api/templates/public${query}`, { method: 'GET' }, 'Could not load templates.');
 }
+export async function listPendingTemplates(): Promise<TemplateSummary[]> {
+  return requestJson('/api/templates/pending-approval', { method: 'GET' }, 'Could not load pending templates.');
+}
 export async function listFavoriteTemplates(): Promise<TemplateSummary[]> {
   return requestJson('/api/templates/favorites', { method: 'GET' }, 'Could not load favorites.');
 }

@@ -25,6 +25,14 @@ const pendingConfirmIndex = ref<number | null>(null);
 const confirmBeforeMarking = ref(localStorage.getItem('bingo-confirm-tiles') === 'true');
 watch(confirmBeforeMarking, (val) => localStorage.setItem('bingo-confirm-tiles', String(val)));
 
+const boardScale = ref<'normal' | 'compact'>(
+  (localStorage.getItem('bingo-board-scale') as 'normal' | 'compact') ?? 'normal',
+);
+watch(boardScale, (val) => localStorage.setItem('bingo-board-scale', val));
+function toggleBoardScale() {
+  boardScale.value = boardScale.value === 'normal' ? 'compact' : 'normal';
+}
+
 function formatTime(iso: string) {
   return new Intl.DateTimeFormat('de-DE', {
     hour: '2-digit',
@@ -130,11 +138,14 @@ function confirmIndividualToggle() {
           <span>{{ t('yourCard') }}</span>
           <div class="section-label-controls">
             <BaseCheckbox v-model="confirmBeforeMarking" :label="t('confirmTiles')" />
+            <button type="button" class="board-size-btn" @click="toggleBoardScale">
+              {{ boardScale === 'compact' ? '⊞' : '⊟' }} {{ boardScale === 'compact' ? 'Normal' : 'Kompakt' }}
+            </button>
             <button type="button" class="popout-btn" @click="openPopout">⤢ Popout</button>
             <b>{{ lobby.completion }}/25 {{ t('completed') }}</b>
           </div>
         </div>
-        <div class="bingo-board" :aria-label="t('yourCard')">
+        <div :class="['bingo-board', { 'bingo-board--compact': boardScale === 'compact' }]" :aria-label="t('yourCard')">
           <button
             v-for="(task, index) in lobby.boardTasks"
             :key="task + index"

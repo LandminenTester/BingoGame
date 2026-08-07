@@ -650,11 +650,42 @@ h2 {
   gap: 9px;
   font-size: 12px;
   color: var(--text);
+  cursor: pointer;
+  user-select: none;
 }
-.base-checkbox input {
+.base-checkbox__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.base-checkbox__box {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent);
+  border-radius: 4px;
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+  color: #fff;
+}
+.base-checkbox__box svg {
+  width: 10px;
+  height: 8px;
+}
+.base-checkbox__box.checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.base-checkbox:hover .base-checkbox__box:not(.checked) {
+  border-color: var(--accent);
+}
+.base-checkbox__label {
+  line-height: 1.3;
 }
 .code-toggle {
   border: 0;
@@ -1359,6 +1390,9 @@ h2 {
   font-size: 10px;
   color: var(--muted);
 }
+.section-label-controls .base-checkbox .base-checkbox__label {
+  color: var(--muted);
+}
 
 /* Popout button */
 .popout-btn {
@@ -1375,6 +1409,210 @@ h2 {
   color: var(--text);
   background: var(--surface-2);
 }
+
+/* ── Compact board ─────────────────────────── */
+.bingo-board--compact .tile {
+  font-size: 10px;
+  min-height: 56px;
+  padding: 18px 4px 6px;
+}
+.bingo-board--compact .tile-index {
+  font-size: 7px;
+}
+
+/* ── Board size toggle button ──────────────── */
+.board-size-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 10px 'DM Mono', monospace;
+  padding: 4px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.board-size-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* ── History cards ─────────────────────────── */
+.history-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.history-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+.history-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+.history-status {
+  font: 9px 'DM Mono';
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.history-status--running { color: var(--lime); border: 1px solid var(--lime); }
+.history-status--paused  { color: #f5a623; border: 1px solid #f5a623; }
+.history-status--completed { color: var(--muted); border: 1px solid var(--line); }
+.history-status--cancelled { color: #ff8890; border: 1px solid #ff8890; }
+.history-status--draft { color: var(--muted); border: 1px solid var(--line); }
+.history-status--open  { color: var(--accent-soft); border: 1px solid var(--accent-soft); }
+.history-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.history-chip {
+  font: 10px 'DM Mono';
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.history-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px 14px;
+  border-top: 1px solid var(--line);
+}
+.history-card-actions .button {
+  font-size: 12px;
+  padding: 7px 14px;
+}
+.history-participants-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 11px 'DM Mono';
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.03em;
+}
+.history-participants-toggle:hover { color: var(--text); }
+.history-participants {
+  border-top: 1px solid var(--line);
+  padding: 10px 16px 14px;
+  display: grid;
+  gap: 8px;
+}
+.history-participant {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+.progress-bar-track {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* ── API key tags ───────────────────────────── */
+.api-key-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.api-key-tag {
+  font: 9px 'DM Mono';
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.api-key-tag--active { color: var(--lime); border: 1px solid var(--lime); }
+.api-key-tag--revoked { color: var(--muted); border: 1px solid var(--line); text-decoration: line-through; }
+.api-key-card--revoked { opacity: 0.55; }
+
+/* ── Template editor header ─────────────────── */
+.template-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.template-editor-copy {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  flex: 1;
+  margin: 0;
+}
+
+/* ── Browser card tasks preview ─────────────── */
+.browser-card-tasks {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.browser-card-tasks li {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.browser-card-more {
+  font: 9px 'DM Mono';
+  color: var(--accent-soft);
+}
+
+/* ── Pending approval admin list ────────────── */
+.pending-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pending-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.pending-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pending-card-name { font-size: 13px; font-weight: 600; }
+.pending-card-author { font: 10px 'DM Mono'; color: var(--muted); }
 
 @media (prefers-reduced-motion: no-preference) {
   .pulse {

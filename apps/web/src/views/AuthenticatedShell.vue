@@ -12,8 +12,8 @@ const router = useRouter();
 const t = (key: TranslationKey) => translate(ui.locale, key);
 
 const nav: { name: string; label: TranslationKey }[] = [
-  { name: 'templates', label: 'templates' },
   { name: 'create-lobby', label: 'createLobby' },
+  { name: 'templates', label: 'templates' },
   { name: 'history', label: 'history' },
   { name: 'settings', label: 'settings' },
 ];

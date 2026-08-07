@@ -116,13 +116,21 @@ async function disableApiKey(id: string) {
     </div>
     <p v-if="shownApiKey" class="secret-key"><b>{{ t('shownOnce') }}</b> {{ shownApiKey }}</p>
     <div class="management-list">
-      <article v-for="key in apiKeys" :key="key.id" class="api-key-card">
+      <article
+        v-for="key in apiKeys"
+        :key="key.id"
+        :class="['api-key-card', { 'api-key-card--revoked': key.revokedAt }]"
+      >
         <div>
-          <b>{{ key.name }}</b>
+          <div class="api-key-head">
+            <b>{{ key.name }}</b>
+            <span :class="['api-key-tag', key.revokedAt ? 'api-key-tag--revoked' : 'api-key-tag--active']">
+              {{ key.revokedAt ? t('revoked') : t('activeKey') }}
+            </span>
+          </div>
           <div class="scope-badges">
             <span v-for="scope in key.scopes" :key="scope" class="scope-badge">{{ scope }}</span>
           </div>
-          <small>{{ key.revokedAt ? t('revoked') : t('activeKey') }}</small>
         </div>
         <button
           v-if="!key.revokedAt"
