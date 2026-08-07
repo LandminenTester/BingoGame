@@ -1,5 +1,5 @@
--- AlterTable: add game column to BingoTemplate
-ALTER TABLE "BingoTemplate" ADD COLUMN "game" VARCHAR(100);
+-- AlterTable: add game column to BingoTemplate (IF NOT EXISTS — column may already exist)
+ALTER TABLE "BingoTemplate" ADD COLUMN IF NOT EXISTS "game" VARCHAR(100);
 
 -- CreateTable: TemplateVote
 CREATE TABLE "TemplateVote" (
