@@ -8,5 +8,5 @@ COPY packages/contracts ./packages/contracts
 RUN corepack enable && pnpm install --frozen-lockfile --filter @twitch-bingo/web... && pnpm --filter @twitch-bingo/web build
 FROM nginx:1.27-alpine
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
