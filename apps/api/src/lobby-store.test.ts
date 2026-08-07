@@ -83,7 +83,7 @@ describe('lobby store', () => {
     ).resolves.toMatchObject({ lobbyId: lobby.id });
   });
 
-  it('does not permit changing a template once a lobby uses it', async () => {
+  it('creates a new template copy when editing a template already used by a lobby', async () => {
     const store = new LobbyStore();
     const template = await store.createTemplate({
       name: 'Immutable',
@@ -98,9 +98,13 @@ describe('lobby store', () => {
       winningCondition: 'first_line',
       maxParticipants: 2,
     });
-    await expect(
-      store.updateTemplate(template.id, 'immutable-host', { name: 'Changed', fields }),
-    ).rejects.toThrow('cannot be edited');
+    const updated = await store.updateTemplate(template.id, 'immutable-host', {
+      name: 'Changed',
+      fields,
+    });
+    // A copy is returned with the new name but a different id
+    expect(updated.name).toBe('Changed');
+    expect(updated.id).not.toBe(template.id);
   });
 
   it('permits direct access to an unlisted template but not private templates', async () => {
