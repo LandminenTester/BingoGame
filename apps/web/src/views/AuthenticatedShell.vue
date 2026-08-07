@@ -52,11 +52,11 @@ async function signOut() {
           :aria-expanded="accountMenuOpen"
           @click="toggleAccountMenu"
         >
-          <span class="avatar">{{ session.twitchUser.displayName.slice(0, 2).toUpperCase() }}</span>
-          <span
-            ><b>{{ session.twitchUser.displayName }}</b
-            ><small>{{ t('streamerAccount') }}</small></span
-          >
+          <span class="avatar-circle">{{ session.twitchUser.displayName.slice(0, 2).toUpperCase() }}</span>
+          <span>
+            <span class="account-name">{{ session.twitchUser.displayName }}</span>
+            <span class="account-sub">{{ t('streamerAccount') }}</span>
+          </span>
         </button>
         <div v-else class="account-signin">
           <b>{{ t('pleaseSignIn') }}</b>
@@ -89,9 +89,9 @@ async function signOut() {
         <RouterLink :to="{ name: 'privacy' }">{{ t('privacyPolicy') }}</RouterLink>
       </div>
       <div class="creator-credit">
-        <span>von</span>
-        <a href="https://github.com/LandminenTester/BingoBuddy" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://twitch.tv/landminentester" target="_blank" rel="noopener">Twitch</a>
+        <span class="creator-label">Erstellt von</span>
+        <a href="https://twitch.tv/landminentester" target="_blank" rel="noopener" class="creator-name">LandminenTester</a>
+        <a href="https://github.com/LandminenTester/BingoBuddy" target="_blank" rel="noopener" class="creator-gh">GitHub</a>
       </div>
     </aside>
 

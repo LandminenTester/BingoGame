@@ -77,32 +77,40 @@ async function submit() {
           ...templates.items.map((template) => ({ value: template.id, label: template.name })),
         ]"
       />
-      <BaseSelect
-        v-model="mode"
-        :label="t('mode')"
-        :options="[
-          { value: 'streamer_controlled', label: t('streamerControlled') },
-          { value: 'individual', label: t('individual') },
-        ]"
-      />
-      <div class="mode-hint-box">{{ mode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}</div>
-      <BaseSelect
-        v-model="win"
-        :label="t('winningCondition')"
-        :options="[
-          { value: 'first_line', label: t('firstLineOption') },
-          { value: 'full_card', label: t('fullCard') },
-        ]"
-      />
-      <BaseInput v-model="limit" type="number" :label="t('participantLimit')" />
-      <BaseInput
-        v-model="password"
-        type="password"
-        :label="t('optionalPassword')"
-        minlength="3"
-        maxlength="128"
-        autocomplete="new-password"
-      />
+      <div class="lobby-full-width">
+        <BaseSelect
+          v-model="mode"
+          :label="t('mode')"
+          :options="[
+            { value: 'streamer_controlled', label: t('streamerControlled') },
+            { value: 'individual', label: t('individual') },
+          ]"
+        />
+      </div>
+      <div class="mode-hint-box lobby-full-width">{{ mode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}</div>
+      <div class="lobby-full-width">
+        <BaseSelect
+          v-model="win"
+          :label="t('winningCondition')"
+          :options="[
+            { value: 'first_line', label: t('firstLineOption') },
+            { value: 'full_card', label: t('fullCard') },
+          ]"
+        />
+      </div>
+      <div class="lobby-full-width">
+        <BaseInput v-model="limit" type="number" :label="t('participantLimit')" />
+      </div>
+      <div class="lobby-password-col">
+        <BaseInput
+          v-model="password"
+          type="password"
+          :label="t('optionalPassword')"
+          minlength="3"
+          maxlength="128"
+          autocomplete="new-password"
+        />
+      </div>
       <div class="toggle-tags-row">
         <button
           type="button"
