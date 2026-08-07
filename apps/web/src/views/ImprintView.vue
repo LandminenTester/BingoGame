@@ -17,15 +17,15 @@ const isGerman = ui.locale === 'de';
     <template v-if="isGerman">
       <h2>Angaben gemäß § 5 TMG</h2>
       <p>
-        TODO: Vollständiger Name / Firmenname<br />
-        TODO: Straße und Hausnummer<br />
-        TODO: PLZ und Ort<br />
-        TODO: Land
+        Johannes Markwordt<br />
+        c/o Block Services<br />
+        Stuttgarter Str. 106<br />
+        70736 Fellbach
       </p>
       <h2>Kontakt</h2>
-      <p>TODO: Telefonnummer<br />TODO: E-Mail-Adresse</p>
+      <p>E-Mail: vinewoodlegacy@gmail.com</p>
       <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
-      <p>TODO: Name und Anschrift der verantwortlichen Person</p>
+      <p>Johannes Markwordt</p>
       <h2>Streitschlichtung</h2>
       <p>
         Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit.
@@ -36,13 +36,13 @@ const isGerman = ui.locale === 'de';
     <template v-else>
       <h2>Information according to § 5 TMG</h2>
       <p>
-        TODO: Full name / company name<br />
-        TODO: Street and house number<br />
-        TODO: Postal code and city<br />
-        TODO: Country
+        Johannes Markwordt<br />
+        c/o Block Services<br />
+        Stuttgarter Str. 106<br />
+        70736 Fellbach
       </p>
       <h2>Contact</h2>
-      <p>TODO: Phone number<br />TODO: Email address</p>
+      <p>E-Mail: vinewoodlegacy@gmail.com</p>
       <h2>Responsible for content according to § 55 Abs. 2 RStV</h2>
       <p>TODO: Name and address of the responsible person</p>
       <h2>Dispute resolution</h2>
@@ -55,6 +55,6 @@ const isGerman = ui.locale === 'de';
 
     <RouterLink :to="{ name: 'landing' }" class="button secondary legal-back">{{
       isGerman ? 'Zurück' : 'Back'
-    }}</RouterLink>
+      }}</RouterLink>
   </main>
 </template>

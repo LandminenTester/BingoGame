@@ -17,8 +17,10 @@ const isGerman = ui.locale === 'de';
     <template v-if="isGerman">
       <h2>Verantwortlicher</h2>
       <p>
-        TODO: Vollständiger Name / Firmenname, Anschrift und E-Mail-Adresse des Verantwortlichen
-        im Sinne der DSGVO.
+        Johannes Markwordt
+        c/o Block Services
+        Stuttgarter Str. 106
+        70736 Fellbach
       </p>
       <h2>Twitch-Anmeldung (OAuth)</h2>
       <p>
@@ -49,8 +51,10 @@ const isGerman = ui.locale === 'de';
     <template v-else>
       <h2>Data controller</h2>
       <p>
-        TODO: Full name / company name, address, and email address of the data controller under
-        the GDPR.
+        Johannes Markwordt
+        c/o Block Services
+        Stuttgarter Str. 106
+        70736 Fellbach
       </p>
       <h2>Twitch sign-in (OAuth)</h2>
       <p>
