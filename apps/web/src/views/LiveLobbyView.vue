@@ -63,6 +63,11 @@ onMounted(async () => {
     if (!restored) loadError.value = t('guestSessionExpired');
     return;
   }
+  if (route.name === 'app-lobby') {
+    // F5-Wiederherstellung: WebSocket-Verbindung aufbauen → Server schickt lobby.snapshot
+    lobby.reconnectToLobby(props.lobbyId);
+    return;
+  }
   loadError.value = t('sessionLost');
 });
 onBeforeUnmount(() => lobby.disconnect());

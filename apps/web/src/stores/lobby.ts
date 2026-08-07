@@ -161,6 +161,10 @@ export const useLobbyStore = defineStore('lobby', {
       const result = await restartLobbyRequest(this.activeLobbyId);
       this.roundNumber = result.roundNumber;
     },
+    reconnectToLobby(lobbyId: string) {
+      this.activeLobbyId = lobbyId;
+      this.connect();
+    },
     handleEvent(event: any) {
       if (event.type === 'lobby.restarted') {
         this.roundNumber = event.roundNumber;
@@ -169,6 +173,8 @@ export const useLobbyStore = defineStore('lobby', {
         this.templateFieldIds = [];
         this.boardTasks = [];
         this.leaderboard = [];
+        // Reconnect: server sends lobby.snapshot on new connection with fresh cards
+        this.connect();
         return;
       }
       if (event.type === 'lobby.members_updated') {
@@ -184,6 +190,7 @@ export const useLobbyStore = defineStore('lobby', {
         );
         this.gameMode = event.lobby?.gameMode ?? this.gameMode;
         this.allowGuests = event.lobby?.allowGuests ?? this.allowGuests;
+        if (event.lobby?.code) this.code = event.lobby.code;
         this.members = event.members ?? this.members;
         this.leaderboard = event.leaderboard ?? this.leaderboard;
         const fields = participant?.card?.fields;
