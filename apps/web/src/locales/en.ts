@@ -162,6 +162,7 @@ export default {
     publicModalBody: 'The template will only appear in the Browse list after admin review. You can set it back to private at any time.',
     by: 'by',
     errorCannotDeleteTemplate: 'This template cannot be deleted.',
+    publishTemplate: 'Publish',
     imprint: 'Imprint',
     privacyPolicy: 'Privacy policy',
     imprintNotice: 'Not a substitute for legal advice — please replace with real details.',

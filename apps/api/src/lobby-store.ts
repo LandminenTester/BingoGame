@@ -173,9 +173,26 @@ export class LobbyStore {
     });
     if (!template || template.deletedAt || template.author?.twitchUserId !== twitchUserId)
       throw new HttpError(404, 'Template not found or forbidden.');
-    if (template._count.lobbies)
-      throw new HttpError(409, 'Templates used by a lobby cannot be edited. Duplicate it instead.');
     if (template.author) await this.assertCanSetVisibility(input.visibility, template.author);
+    // If the template is already referenced by lobbies, duplicate it so old sessions
+    // keep their exact field set while new sessions pick up the edited version.
+    if (template._count.lobbies > 0) {
+      const [newTemplate] = await db.$transaction([
+        db.bingoTemplate.create({
+          data: {
+            name: input.name,
+            visibility: input.visibility ?? 'private',
+            authorId: template.authorId,
+            tags: template.tags,
+            language: template.language,
+            fields: { create: input.fields.map((label, position) => ({ label, position })) },
+          },
+          include: { fields: { orderBy: { position: 'asc' } } },
+        }),
+        db.bingoTemplate.update({ where: { id }, data: { deletedAt: new Date() } }),
+      ]);
+      return newTemplate;
+    }
     return db.$transaction(async (tx) => {
       await tx.bingoTemplateField.deleteMany({ where: { templateId: id } });
       return tx.bingoTemplate.update({

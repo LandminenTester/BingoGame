@@ -337,12 +337,12 @@ h2 {
   background: var(--surface);
   border: 0;
   color: var(--text);
-  padding: 17px 11px 10px;
-  text-align: left;
+  padding: 17px 8px 10px;
+  text-align: center;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   font:
     600 clamp(11px, 1.2vw, 15px)/1.12 'Barlow Condensed',
     sans-serif;
@@ -1013,6 +1013,7 @@ h2 {
   font: var(--fs-2xs) 'DM Mono';
   color: var(--accent-soft);
   border: 1px solid var(--line);
+  text-transform: uppercase;
   border-radius: 20px;
   padding: 3px 8px;
 }
@@ -1424,10 +1425,12 @@ h2 {
 }
 
 /* ── Compact board ─────────────────────────── */
+.bingo-board--compact {
+  max-width: 320px;
+}
 .bingo-board--compact .tile {
   font-size: var(--fs-xs);
-  min-height: 56px;
-  padding: 18px 4px 6px;
+  padding: 14px 3px 8px;
 }
 .bingo-board--compact .tile-index {
   font-size: var(--fs-2xs);
@@ -1555,13 +1558,19 @@ h2 {
   transition: width 0.3s;
 }
 
+/* ── Tile: no focus ring on click ───────────── */
+.tile:focus { outline: none; }
+.tile:focus-visible { outline: none; box-shadow: none; }
+
 /* ── API key tags ───────────────────────────── */
+.api-key-body { flex: 1; min-width: 0; }
 .api-key-head {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
+.api-key-remove { margin-left: auto; }
 .api-key-tag {
   font: var(--fs-2xs) 'DM Mono';
   padding: 3px 8px;
@@ -1769,6 +1778,63 @@ h2 {
   .placeholder-view h1 {
     font-size: 46px;
   }
+}
+
+/* ── Template editor actions ────────────────── */
+.template-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.button--publish {
+  background: transparent;
+  border: 1px solid var(--accent-soft);
+  color: var(--accent-soft);
+  padding: 7px 14px;
+  font: 600 var(--fs-sm) 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.button--publish:hover {
+  background: var(--accent-soft);
+  color: var(--bg);
+}
+
+/* ── Toggle tags (CreateLobbyView) ──────────── */
+.toggle-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toggle-tag {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  font: 600 var(--fs-sm) 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.toggle-tag:hover { border-color: var(--text); color: var(--text); }
+.toggle-tag.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Mode hint box (styled field) ───────────── */
+.mode-hint-box {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* Creator credit in sidebar footer */

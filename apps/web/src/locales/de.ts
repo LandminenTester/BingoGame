@@ -163,6 +163,7 @@ export default {
     publicModalBody: 'Die Vorlage wird erst nach Admin-Prüfung in der Entdecken-Liste angezeigt. Du kannst sie jederzeit wieder auf Privat setzen.',
     by: 'von',
     errorCannotDeleteTemplate: 'Diese Vorlage kann nicht gelöscht werden.',
+    publishTemplate: 'Veröffentlichen',
     imprint: 'Impressum',
     privacyPolicy: 'Datenschutz',
     imprintNotice: 'Kein Ersatz für Rechtsberatung – bitte durch echte Angaben ersetzen.',

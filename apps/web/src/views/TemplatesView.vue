@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTemplatesStore } from '../stores/templates';
 import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
 import { Pencil, Trash2, X, Plus } from '@lucide/vue';
 import BaseInput from '../components/BaseInput.vue';
-import BaseSelect from '../components/BaseSelect.vue';
 import BaseButton from '../components/BaseButton.vue';
 import BaseModal from '../components/BaseModal.vue';
 import type { TemplateSummary } from '../api';
@@ -31,31 +30,18 @@ const t = (key: TranslationKey) => translate(ui.locale, key);
 
 const blankFields = () => Array.from({ length: TASK_MIN }, (_, index) => `Aufgabe ${index + 1}`);
 const name = ref('');
-const visibility = ref<'private' | 'public' | 'unlisted'>('private');
-const previousVisibility = ref<string>('private');
-const showPublicModal = ref(false);
+const currentTemplateVisibility = ref<string>('private');
+const showPublishModal = ref(false);
 const fields = ref(blankFields());
 const error = ref('');
 const pendingDelete = ref<TemplateSummary | null>(null);
-
-watch(visibility, (newVal, oldVal) => {
-  if (newVal === 'public') {
-    previousVisibility.value = oldVal;
-    showPublicModal.value = true;
-  }
-});
-
-function cancelPublicModal() {
-  visibility.value = previousVisibility.value as 'private' | 'public' | 'unlisted';
-  showPublicModal.value = false;
-}
 
 onMounted(() => templates.fetchAll());
 
 function resetForm() {
   templates.select(null);
   name.value = '';
-  visibility.value = 'private';
+  currentTemplateVisibility.value = 'private';
   fields.value = blankFields();
   error.value = '';
 }
@@ -63,7 +49,7 @@ function resetForm() {
 function loadTemplate(template: TemplateSummary) {
   templates.select(template.id);
   name.value = template.name;
-  visibility.value = template.visibility as 'private' | 'public' | 'unlisted';
+  currentTemplateVisibility.value = template.visibility;
   fields.value = template.fields.map((field) => field.label);
   error.value = '';
 }
@@ -79,10 +65,29 @@ function removeTaskRow(index: number) {
 
 async function submit() {
   try {
-    const input = { name: name.value, visibility: visibility.value, fields: fields.value };
-    if (templates.selectedId) await templates.update(templates.selectedId, input);
-    else await templates.create(input);
-    resetForm();
+    const vis = (currentTemplateVisibility.value || 'private') as 'private' | 'public' | 'unlisted';
+    const input = { name: name.value, visibility: vis, fields: fields.value };
+    const result = templates.selectedId
+      ? await templates.update(templates.selectedId, input)
+      : await templates.create(input);
+    loadTemplate(result);
+    error.value = '';
+  } catch (err) {
+    error.value = (err as Error).message;
+  }
+}
+
+async function confirmPublish() {
+  showPublishModal.value = false;
+  if (!templates.selectedId) return;
+  try {
+    const result = await templates.update(templates.selectedId, {
+      name: name.value,
+      visibility: 'public',
+      fields: fields.value,
+    });
+    loadTemplate(result);
+    error.value = '';
   } catch (err) {
     error.value = (err as Error).message;
   }
@@ -145,19 +150,19 @@ async function confirmDelete() {
       <div class="template-editor">
         <div class="template-editor-header">
           <p class="template-editor-copy">{{ t('templateCopy') }}</p>
-          <BaseButton type="submit" form="template-form">{{ t('saveTemplate') }}</BaseButton>
+          <div class="template-editor-actions">
+            <button
+              v-if="templates.selectedId && currentTemplateVisibility === 'private'"
+              type="button"
+              class="button button--publish"
+              @click="showPublishModal = true"
+            >{{ t('publishTemplate') }}</button>
+            <BaseButton type="submit" form="template-form">{{ t('saveTemplate') }}</BaseButton>
+          </div>
         </div>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <form id="template-form" class="builder-form" @submit.prevent="submit">
           <BaseInput v-model="name" :label="t('templateName')" required maxlength="100" />
-          <BaseSelect
-            v-model="visibility"
-            :label="t('templateVisibility')"
-            :options="[
-              { value: 'private', label: t('private') },
-              { value: 'public', label: t('publicPending') },
-            ]"
-          />
           <div class="task-pool-grid">
             <div v-for="(_, index) in fields" :key="index" class="task-pool-row">
               <span class="task-pool-index">{{ index + 1 }}</span>
@@ -196,13 +201,13 @@ async function confirmDelete() {
       @confirm="confirmDelete"
     />
     <BaseModal
-      v-if="showPublicModal"
+      v-if="showPublishModal"
       :title="t('publicModalTitle')"
       :body="t('publicModalBody')"
       :cancel-label="t('cancel')"
-      :confirm-label="t('confirmAction')"
-      @cancel="cancelPublicModal"
-      @confirm="showPublicModal = false"
+      :confirm-label="t('publishTemplate')"
+      @cancel="showPublishModal = false"
+      @confirm="confirmPublish"
     />
   </template>
   <RouterView v-else />

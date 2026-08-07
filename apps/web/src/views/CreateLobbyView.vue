@@ -7,7 +7,6 @@ import { useUiStore } from '../stores/ui';
 import { translate, type TranslationKey } from '../i18n';
 import BaseInput from '../components/BaseInput.vue';
 import BaseSelect from '../components/BaseSelect.vue';
-import BaseCheckbox from '../components/BaseCheckbox.vue';
 import BaseButton from '../components/BaseButton.vue';
 
 const templates = useTemplatesStore();
@@ -86,9 +85,7 @@ async function submit() {
           { value: 'individual', label: t('individual') },
         ]"
       />
-      <p class="hint">
-        {{ mode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}
-      </p>
+      <div class="mode-hint-box">{{ mode === 'individual' ? t('gameModeIndividualHint') : t('gameModeStreamerControlledHint') }}</div>
       <BaseSelect
         v-model="win"
         :label="t('winningCondition')"
@@ -106,8 +103,18 @@ async function submit() {
         maxlength="128"
         autocomplete="new-password"
       />
-      <BaseCheckbox v-model="allowLateJoin" :label="t('allowLateJoinLabel')" />
-      <BaseCheckbox v-model="allowGuests" :label="t('allowGuestsLabel')" />
+      <div class="toggle-tags-row">
+        <button
+          type="button"
+          :class="['toggle-tag', { active: allowLateJoin }]"
+          @click="allowLateJoin = !allowLateJoin"
+        >{{ t('allowLateJoinLabel') }}</button>
+        <button
+          type="button"
+          :class="['toggle-tag', { active: allowGuests }]"
+          @click="allowGuests = !allowGuests"
+        >{{ t('allowGuestsLabel') }}</button>
+      </div>
       <BaseButton type="submit" :disabled="submitting">{{ t('createLobby') }}</BaseButton>
     </form>
   </section>
